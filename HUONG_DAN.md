@@ -13,9 +13,12 @@ Công cụ dành cho các tổ chức hành nghề công chứng có bản scan 
 
 ### Cách 1 — Bản đóng gói cho Windows (khuyên dùng)
 
-1. Tải file `TachVanBan-…-windows-x64.zip` ở trang **Releases** của dự án trên GitHub. File này đã kèm sẵn Python, Tesseract và gói tiếng Việt.
-2. Giải nén ra một thư mục, ví dụ `D:\TachVanBan`, rồi chạy **`TachVanBan.exe`**.
-3. Nếu Windows báo *"Windows protected your PC"*, bấm **More info**, rồi **Run anyway**. Cảnh báo này hiện ra vì bản chạy chưa được ký số.
+Vào trang **Releases** của dự án trên GitHub và tải một trong hai file. Cả hai đều đã kèm sẵn Python, Tesseract và gói tiếng Việt.
+
+- **`TachVanBan-…-cai-dat.exe`** (khuyên dùng, file nhỏ nhất): chạy file, bấm Next. Mặc định cài cho riêng người dùng hiện tại nên **không cần quyền quản trị**. Sau khi cài có biểu tượng ở menu Start, gỡ được trong *Settings → Apps*.
+- **`TachVanBan-…-windows-x64.zip`**: giải nén ra một thư mục, ví dụ `D:\TachVanBan`, rồi chạy **`TachVanBan.exe`**.
+
+Nếu Windows báo *"Windows protected your PC"*, bấm **More info**, rồi **Run anyway**. Cảnh báo này hiện ra vì file chưa được ký số.
 
 Với cách này, bạn bỏ qua phần còn lại của mục 1 và chuyển sang mục 2.
 
@@ -50,7 +53,7 @@ Nếu lỡ quên tick Vietnamese thì không cần cài lại. Mở giao diện 
 
 Mở giao diện theo một trong các cách sau:
 
-- **Bản đóng gói:** chạy `TachVanBan.exe`.
+- **Bản cài hoặc bản zip:** mở *Tách văn bản công chứng* từ menu Start, hoặc chạy `TachVanBan.exe`.
 - **Mã nguồn trên Windows:** bấm đúp `chay_giao_dien.bat`.
 - **macOS/Linux:** chạy `python3 giao_dien.py`.
 

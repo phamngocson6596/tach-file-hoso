@@ -16,10 +16,15 @@ Công cụ đọc từng trang, nhận ra trang nào thuộc văn bản (từ ti
 
 ## Tải về và sử dụng (Windows)
 
-1. Vào trang **[Releases](../../releases)** và tải file `TachVanBan-…-windows-x64.zip`. File này đã kèm sẵn Python, Tesseract và gói tiếng Việt, **không cần cài gì thêm**.
-2. Giải nén ra một thư mục, ví dụ `D:\TachVanBan`, rồi chạy **`TachVanBan.exe`**.
-3. Windows có thể hiện cảnh báo *"Windows protected your PC"* vì bản chạy chưa được ký số. Bấm **More info**, rồi **Run anyway**.
-4. Chọn thư mục PDF scan và thư mục kết quả, khai báo cấu trúc hồ sơ của đơn vị, rồi bấm **Bắt đầu tách**. Lần đầu nên **chạy thử 50 file** và soát kỹ.
+Vào trang **[Releases](../../releases)** và tải một trong hai file. Cả hai đều đã kèm sẵn Python, Tesseract và gói tiếng Việt, **không cần cài gì thêm**.
+
+| File | Dùng khi |
+|---|---|
+| **`TachVanBan-…-cai-dat.exe`** (khuyên dùng, nhỏ nhất) | Chạy file, bấm Next là xong. Có biểu tượng ở menu Start và có mục gỡ cài đặt. Mặc định cài cho riêng người dùng hiện tại, **không cần quyền quản trị**. |
+| `TachVanBan-…-windows-x64.zip` | Không muốn cài. Giải nén ra một thư mục rồi chạy `TachVanBan.exe`. |
+
+1. Windows có thể hiện cảnh báo *"Windows protected your PC"* vì file chưa được ký số. Bấm **More info**, rồi **Run anyway**.
+2. Chọn thư mục PDF scan và thư mục kết quả, khai báo cấu trúc hồ sơ của đơn vị, rồi bấm **Bắt đầu tách**. Lần đầu nên **chạy thử 50 file** và soát kỹ.
 
 Hướng dẫn chi tiết, ý nghĩa từng tuỳ chọn và cách sửa tay: **[HUONG_DAN.md](HUONG_DAN.md)**.
 
@@ -52,16 +57,16 @@ Mẫu tiêu đề và lời chứng có thể khác nhau giữa các địa phư
 
 1. Sửa `PHIEN_BAN` trong `tach_van_ban.py` (ví dụ `0.3.1`) rồi commit.
 2. Trên GitHub, vào **Releases**, chọn **Draft a new release**, tạo tag `v0.3.1`, ghi chú thay đổi, rồi bấm **Publish release**.
-3. Quy trình **"Đóng gói bản Windows"** (`.github/workflows/build-windows.yml`) tự chạy, mất khoảng 10–20 phút. Quy trình này:
+3. Quy trình **"Đóng gói bản Windows"** (`.github/workflows/build-windows.yml`) tự chạy, mất khoảng 5–15 phút. Quy trình này:
    - dựng `TachVanBan.exe` bằng PyInstaller;
-   - kèm Tesseract và gói tiếng Việt;
-   - **tự chạy thử trên dữ liệu giả**;
-   - đính file `.zip` vào release.
+   - kèm Tesseract và gói tiếng Việt, đã bỏ các phần không dùng;
+   - **tự chạy thử trên dữ liệu giả**, cả bản zip lẫn bản đã cài từ bộ cài;
+   - đính **bộ cài `.exe`** và **bản `.zip`** vào release.
 
-   Nếu bước tự kiểm tra không đạt, sẽ không có file nào được đính kèm.
-4. Muốn dựng thử mà không phát hành: vào tab **Actions**, chọn **Đóng gói bản Windows**, bấm **Run workflow**. File `.zip` nằm ở mục *Artifacts* của lần chạy.
+   Nếu bước tự kiểm tra không đạt, sẽ không có file nào được đính kèm. Log của bước đóng gói có bảng dung lượng từng thành phần.
+4. Muốn dựng thử mà không phát hành: vào tab **Actions**, chọn **Đóng gói bản Windows**, bấm **Run workflow**. Hai file nằm ở mục *Artifacts* của lần chạy.
 
-Muốn đóng gói trên máy Windows của mình: cài Python, Tesseract, `pip install -r requirements.txt pyinstaller`, rồi chạy `powershell -ExecutionPolicy Bypass -File packaging\build_windows.ps1`.
+Muốn đóng gói trên máy Windows của mình: cài Python, Tesseract, Inno Setup 6, `pip install -r requirements.txt pyinstaller`, rồi chạy `powershell -ExecutionPolicy Bypass -File packaging\build_windows.ps1`.
 
 ## Giấy phép
 

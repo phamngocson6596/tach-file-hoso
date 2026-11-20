@@ -1,6 +1,8 @@
-# Tự đóng gói bản Windows (giải nén là chạy, kèm sẵn Python + Tesseract + gói tiếng Việt)
-# - Mỗi khi bấm "Publish release" trên GitHub: đóng gói, tự kiểm tra, rồi đính file .zip vào release đó.
-# - Hoặc chạy tay: tab Actions -> "Đóng gói bản Windows" -> Run workflow (file .zip nằm ở mục Artifacts).
+# Tự đóng gói bản Windows (kèm sẵn Python + Tesseract + gói tiếng Việt), xuất 2 dạng:
+#   TachVanBan-<phiên bản>-cai-dat.exe       bộ cài 1 file, nhỏ nhất, không cần quyền quản trị
+#   TachVanBan-<phiên bản>-windows-x64.zip   bản giải nén là chạy
+# - Mỗi khi bấm "Publish release" trên GitHub: đóng gói, tự kiểm tra, rồi đính 2 file vào release đó.
+# - Hoặc chạy tay: tab Actions -> "Đóng gói bản Windows" -> Run workflow (file nằm ở mục Artifacts).
 name: Đóng gói bản Windows
 
 on:
@@ -27,8 +29,8 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt pyinstaller
 
-      - name: Cài Tesseract OCR
-        run: choco install tesseract --no-progress -y
+      - name: Cài Tesseract OCR và Inno Setup
+        run: choco install tesseract innosetup --no-progress -y
 
       - name: Tải gói tiếng Việt cho Tesseract
         run: curl.exe -fsSL -o vie.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/vie.traineddata
@@ -37,15 +39,23 @@ jobs:
         shell: pwsh
         run: ./packaging/build_windows.ps1 -VieModel vie.traineddata
 
-      - name: Lưu bản đóng gói
+      - name: Lưu bộ cài
+        uses: actions/upload-artifact@v4
+        with:
+          name: TachVanBan-cai-dat
+          path: dist/TachVanBan-*-cai-dat.exe
+          compression-level: 0
+
+      - name: Lưu bản zip
         uses: actions/upload-artifact@v4
         with:
           name: TachVanBan-windows-x64
           path: dist/TachVanBan-*.zip
+          compression-level: 0
 
       - name: Đính kèm vào release
         if: github.event_name == 'release'
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" (Get-ChildItem dist/TachVanBan-*.zip).FullName --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" (Get-ChildItem dist/TachVanBan-*-cai-dat.exe, dist/TachVanBan-*.zip).FullName --clobber
