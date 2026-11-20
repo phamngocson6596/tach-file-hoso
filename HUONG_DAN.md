@@ -152,6 +152,27 @@ KetQua/
 - **Không thấy:** không nhận ra văn bản công chứng nào, ví dụ file chỉ có hồ sơ hoặc trang bị xoay ngang.
 - **Lỗi:** file hỏng hoặc có mật khẩu.
 
+### Đặt tên file kết quả
+
+Ở mục **4. Đầu ra**, ô **Tên file văn bản** và **tên file hồ sơ** nhận một *mẫu tên*. Bạn chọn mẫu có sẵn hoặc gõ tự do; ngay dưới ô có dòng ví dụ để xem trước.
+
+| Trường | Lấy từ | Ví dụ |
+|---|---|---|
+| `{ten}` | tên file gốc | `2023_027529` |
+| `{so_cc}` | số công chứng trong lời chứng. Nếu khớp với số trong tên file thì lấy theo tên file, để tránh OCR đọc sai | `027529` |
+| `{nam}` | năm công chứng | `2023` |
+| `{ngay}` | ngày công chứng | `2023-11-30` |
+| `{loai}` | tiêu đề văn bản, không dấu | `GIAY_UY_QUYEN` |
+| `{stt}` | số thứ tự văn bản trong file (khi một file có nhiều văn bản) | `1` |
+
+Ví dụ: mẫu `{nam}_{so_cc}_{loai}` cho ra `2023_027529_GIAY_UY_QUYEN.pdf`.
+
+- Giữ nguyên cấu trúc thư mục con như bản gốc.
+- **Trùng tên** thì tự thêm `(2)`, `(3)`…
+- File có nhiều văn bản mà mẫu không có `{stt}` thì tự thêm `__vb1`, `__vb2`.
+- Văn bản nào **thiếu dữ liệu** cho mẫu (ví dụ không đọc được số công chứng) thì **giữ tên gốc**. Bảng Excel có các cột `so_cong_chung`, `ngay_cong_chung`, `loai_van_ban` và `file_van_ban`. Bạn điền hoặc sửa các cột này, rồi bấm **Cắt bản chốt**: tên file sẽ được đặt lại theo đúng giá trị đã sửa.
+- Nếu chọn **Xuất thêm phần hồ sơ còn lại**, khi cắt bản chốt phần hồ sơ được ghi vào thư mục **`chot_ho_so`**, cạnh thư mục `chot`.
+
 ### Kiểm tra thiếu, thừa, trùng trang
 
 Với mỗi văn bản đã tách, công cụ tự kiểm tra số trang. Kết quả ghi ở cột **`nghi_thieu_trang`** trong bảng Excel. File có nghi vấn được đưa vào nhóm **cần kiểm tra**; trong trang xem lại có nút lọc **"Nghi thiếu/thừa trang"**.

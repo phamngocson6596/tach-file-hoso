@@ -31,6 +31,8 @@ F_CAU_HINH = Path.home() / ".tach_van_ban_cauhinh.json"
 
 ENGINE = {"Tesseract (khuyên dùng)": "tesseract", "Screen AI của Chrome (thử nghiệm)": "screenai"}
 VI_TRI = {"Không cố định": "tu_dong", "Đầu file": "dau", "Cuối file": "cuoi"}
+MAU_VB = ["{ten}", "{ten}_VB", "{nam}_{so_cc}", "{nam}_{so_cc}_{loai}", "{so_cc}_{loai}", "{ngay}_{so_cc}"]
+MAU_HS = ["{ten}", "{ten}_HS", "{nam}_{so_cc}_HS", "{so_cc}_HS"]
 NHAN_TT = {"DAT": ("Đạt", "#15803d"), "CAN_KIEM_TRA": ("Cần kiểm tra", "#b45309"),
            "KHONG_THAY": ("Không thấy", "#b91c1c"), "LOI": ("Lỗi", "#7f1d1d")}
 
@@ -75,7 +77,7 @@ class UngDung(tk.Tk):
         super().__init__()
         self.tvb = tvb
         self.title(f"Tách văn bản công chứng · {tvb.PHIEN_BAN}")
-        self.geometry("1180x780")
+        self.geometry("1280x800")
         self.minsize(1000, 680)
         self.q = queue.Queue()
         self.dung = threading.Event()
@@ -122,6 +124,8 @@ class UngDung(tk.Tk):
             luu_chu=tk.BooleanVar(value=False),
             gioi_han=tk.StringVar(value="0"),
             kiem_tra_cap_nhat=tk.BooleanVar(value=True),
+            mau_ten_vb=tk.StringVar(value=md["mau_ten_vb"]),
+            mau_ten_hs=tk.StringVar(value=md["mau_ten_hs"]),
         )
 
     def _dung_giao_dien(self):
@@ -292,20 +296,39 @@ class UngDung(tk.Tk):
     def _khung_dau_ra(self, cha, hang):
         f = ttk.LabelFrame(cha, text="4. Đầu ra", padding=8)
         f.grid(row=hang, column=0, sticky="ew", pady=(0, 8))
-        ttk.Checkbutton(f, text="Xuất thêm phần hồ sơ còn lại (thư mục ho_so)", variable=self.v["xuat_ho_so"]) \
-            .grid(row=0, column=0, columnspan=3, sticky="w")
+        f.columnconfigure(1, weight=1)
+        goi_y_ten = ("Mẫu đặt tên file, gõ tự do hoặc chọn sẵn. Các trường:\n"
+                     + "\n".join(f"{{{k}}}  {v}" for k, v in self.tvb.TRUONG_TEN.items())
+                     + "\n\nVăn bản nào thiếu số/ngày/loại (OCR không đọc được) sẽ giữ tên gốc; điền tay vào cột "
+                       "so_cong_chung / ngay_cong_chung / loai_van_ban trong bảng Excel rồi cắt bản chốt để đặt lại. "
+                       "Trùng tên thì tự thêm (2), (3)…")
+        ttk.Label(f, text="Tên file văn bản:").grid(row=0, column=0, sticky="w")
+        w = ttk.Combobox(f, textvariable=self.v["mau_ten_vb"], values=MAU_VB)
+        w.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(4, 0))
+        GoiY(w, goi_y_ten)
+        self.lb_vi_du = ttk.Label(f, text="", style="Goiy.TLabel")
+        self.lb_vi_du.grid(row=1, column=1, columnspan=2, sticky="w", padx=(4, 0))
+        r = ttk.Frame(f)
+        r.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(2, 0))
+        ttk.Checkbutton(r, text="Xuất thêm phần hồ sơ còn lại, tên:", variable=self.v["xuat_ho_so"]).pack(side="left")
+        w = ttk.Combobox(r, textvariable=self.v["mau_ten_hs"], values=MAU_HS, width=18)
+        w.pack(side="left", padx=4, fill="x", expand=True)
+        GoiY(w, goi_y_ten + "\n\nFile hồ sơ nằm trong thư mục ho_so (khi tách) và chot_ho_so (khi cắt bản chốt).")
+        for k in ("mau_ten_vb", "mau_ten_hs"):
+            self.v[k].trace_add("write", lambda *_: self._cap_nhat_vi_du())
         ttk.Checkbutton(f, text="Ảnh thu nhỏ cho cả file đạt (để soát kỹ khi chạy thử)", variable=self.v["xem_tat_ca"]) \
-            .grid(row=1, column=0, columnspan=3, sticky="w")
+            .grid(row=3, column=0, columnspan=3, sticky="w")
         w = ttk.Checkbutton(f, text="Lưu chữ OCR để dò lỗi (thư mục chu_ocr — có dữ liệu cá nhân)",
                             variable=self.v["luu_chu"])
-        w.grid(row=2, column=0, columnspan=3, sticky="w")
+        w.grid(row=4, column=0, columnspan=3, sticky="w")
         r = ttk.Frame(f)
-        r.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        r.grid(row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
         ttk.Label(r, text="Chỉ chạy thử").pack(side="left")
         ttk.Spinbox(r, from_=0, to=100000, textvariable=self.v["gioi_han"], width=7).pack(side="left", padx=4)
         ttk.Label(r, text="file đầu tiên (0 = tất cả)", style="Goiy.TLabel").pack(side="left")
         w = ttk.Checkbutton(f, text="Tự kiểm tra bản mới khi mở phần mềm", variable=self.v["kiem_tra_cap_nhat"])
-        w.grid(row=4, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        w.grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        self._cap_nhat_vi_du()
         GoiY(w, "Khi mở, phần mềm hỏi GitHub số phiên bản mới nhất để báo nếu có bản mới. "
                 "Chỉ gửi đúng yêu cầu này, không gửi bất kỳ dữ liệu hồ sơ nào. Bỏ tick nếu muốn phần mềm "
                 "hoàn toàn không kết nối mạng.")
@@ -336,7 +359,7 @@ class UngDung(tk.Tk):
             o = tk.Label(r, text=f"{ten}: 0", fg="white", bg=mau, padx=8, pady=2, font=("Segoe UI", 9, "bold"))
             o.pack(side="left", padx=(0, 6))
             self.lb_dem_tt[k] = (o, ten)
-        self.lb_thieu = tk.Label(r, text="Nghi thiếu trang: 0", fg="#b91c1c", bg="#fee2e2", padx=8, pady=2,
+        self.lb_thieu = tk.Label(r, text="Thiếu trang: 0", fg="#b91c1c", bg="#fee2e2", padx=8, pady=2,
                                  font=("Segoe UI", 9, "bold"))
         self.lb_thieu.pack(side="left", padx=(6, 0))
         GoiY(self.lb_thieu, "Số file có văn bản nghi thiếu, thừa hoặc trùng trang (so với số trang ghi trong lời "
@@ -361,6 +384,20 @@ class UngDung(tk.Tk):
         lb.bind("<Configure>", lambda e: lb.configure(wraplength=max(200, e.width - 8)))
         self.nut_chot = ttk.Button(f, text="Cắt bản chốt theo bảng Excel", command=self.cat_chot)
         self.nut_chot.pack(anchor="w", pady=(6, 0))
+
+    def _cap_nhat_vi_du(self):
+        """Xem trước tên file với một văn bản mẫu."""
+        if not hasattr(self, "lb_vi_du"):
+            return
+        tvb = self.tvb
+        gt = tvb.gia_tri_ten("2023_027529.pdf", "027529", (2023, 11, 30), "GIẤY ỦY QUYỀN", 1)
+        loi = tvb.kiem_tra_mau_ten(self.v["mau_ten_vb"].get()) or (
+            tvb.kiem_tra_mau_ten(self.v["mau_ten_hs"].get()) and "Tên hồ sơ: " + tvb.kiem_tra_mau_ten(self.v["mau_ten_hs"].get()))
+        if loi:
+            self.lb_vi_du.configure(text="✖ " + loi, foreground="#b91c1c")
+            return
+        vb, _ = tvb.duong_dan_theo_mau("2023_027529.pdf", self.v["mau_ten_vb"].get(), gt, 1)
+        self.lb_vi_du.configure(text=f"Ví dụ: 2023_027529.pdf → {vb}", foreground="#6b7280")
 
     # ------------------------------------------------------------------ thao tác
     def chon_vao(self):
@@ -407,6 +444,7 @@ class UngDung(tk.Tk):
             dpi=int(v["dpi"].get() or 200), tesseract=v["tesseract"].get().strip() or None,
             luon_ocr=v["luon_ocr"].get(), xuat_ho_so=v["xuat_ho_so"].get(), xem_tat_ca=v["xem_tat_ca"].get(),
             luu_chu=v["luu_chu"].get(),
+            mau_ten_vb=v["mau_ten_vb"].get().strip() or "{ten}", mau_ten_hs=v["mau_ten_hs"].get().strip() or "{ten}",
         )
         return cfg
 
@@ -470,6 +508,8 @@ class UngDung(tk.Tk):
         if Path(ra).resolve() == Path(vao).resolve():
             messagebox.showwarning("Trùng thư mục", "Thư mục kết quả phải khác thư mục đầu vào.")
             return
+        if not self._mau_ten_hop_le():
+            return
         if not self.kiem_tra_ocr():
             messagebox.showerror("Chưa sẵn sàng", self.lb_ocr.cget("text"))
             return
@@ -492,7 +532,7 @@ class UngDung(tk.Tk):
             o.configure(text=f"{ten}: 0")
         self._dem_hien = {k: 0 for k in NHAN_TT}
         self._dem_thieu = 0
-        self.lb_thieu.configure(text="Nghi thiếu trang: 0")
+        self.lb_thieu.configure(text="Thiếu trang: 0")
         self._dang_chay(True)
 
         def chay():
@@ -509,6 +549,14 @@ class UngDung(tk.Tk):
         self.luong = threading.Thread(target=chay, daemon=True)
         self.luong.start()
 
+    def _mau_ten_hop_le(self) -> bool:
+        for nhan, k in (("Tên file văn bản", "mau_ten_vb"), ("Tên file hồ sơ", "mau_ten_hs")):
+            loi = self.tvb.kiem_tra_mau_ten(self.v[k].get().strip() or "{ten}")
+            if loi:
+                messagebox.showwarning("Mẫu tên chưa đúng", f"{nhan}: {loi}")
+                return False
+        return True
+
     def dung_lai(self):
         self.dung.set()
         self.nut_dung.configure(state="disabled")
@@ -523,11 +571,14 @@ class UngDung(tk.Tk):
         if not bang.exists():
             messagebox.showinfo("Chưa có bảng", "Chưa có bao_cao.xlsx trong thư mục kết quả. Hãy chạy tách trước.")
             return
+        if not self._mau_ten_hop_le():
+            return
+        cfg = self._cfg()
         self._dang_chay(True)
 
         def chay():
             try:
-                self.tvb.cat_theo_bang(vao, ra, bang, log=lambda s: self.q.put(("log", s)))
+                self.tvb.cat_theo_bang(vao, ra, bang, log=lambda s: self.q.put(("log", s)), cfg=cfg)
             except PermissionError:
                 self.q.put(("log", "LỖI: không đọc được bảng — hãy đóng file Excel rồi bấm lại."))
             except Exception as e:
@@ -555,7 +606,7 @@ class UngDung(tk.Tk):
                     k, n, tt, thieu = gt
                     if thieu:
                         self._dem_thieu += 1
-                        self.lb_thieu.configure(text=f"Nghi thiếu trang: {self._dem_thieu}")
+                        self.lb_thieu.configure(text=f"Thiếu trang: {self._dem_thieu}")
                     self.tien_do.configure(maximum=n, value=k)
                     self.lb_tien_do.configure(text=f"{k}/{n} file")
                     self._dem_hien[tt] = self._dem_hien.get(tt, 0) + 1

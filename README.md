@@ -12,6 +12,7 @@ Công cụ đọc từng trang, nhận ra trang nào thuộc văn bản (từ ti
 - Nhận ra trang tiêu đề, thân hợp đồng, trang ký, lời chứng, trang trắng, và các giấy tờ thường gặp trong hồ sơ.
 - **Loại bản sao văn bản công chứng cũ lưu lẫn trong hồ sơ** nhờ các dấu hiệu: số công chứng trong tên file, ngày công chứng, tên tổ chức, vị trí trong file. Dùng được cả khi mỗi file có một văn bản lẫn khi có nhiều văn bản.
 - **Phát hiện văn bản bị thiếu, thừa hoặc trùng trang** do scan lỗi: so số trang tách được với câu *"…gồm … tờ, … trang"* trong lời chứng, dò số trang in trên trang và số Điều bị nhảy cóc.
+- **Đặt tên file kết quả theo mẫu**, ví dụ `{nam}_{so_cc}_{loai}` → `2023_027529_GIAY_UY_QUYEN.pdf`. Mẫu dùng số công chứng, ngày, loại văn bản đọc được từ lời chứng; sửa tay được trong bảng Excel.
 - Trang **xem lại** có ảnh thu nhỏ từng trang. Bảng **Excel** để sửa tay, sau đó **cắt bản chốt** theo bảng.
 - Có cả giao diện lẫn dòng lệnh. Xử lý song song nhiều file và nhớ kết quả OCR, nên lần chạy lại gần như tức thì.
 
