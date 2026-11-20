@@ -31,6 +31,8 @@ Link trên luôn trỏ tới bản mới nhất. Các bản trước xem ở tra
 1. Windows có thể hiện cảnh báo *"Windows protected your PC"* vì file chưa được ký số. Bấm **More info**, rồi **Run anyway**.
 2. Chọn thư mục PDF scan và thư mục kết quả, khai báo cấu trúc hồ sơ của đơn vị, rồi bấm **Bắt đầu tách**. Lần đầu nên **chạy thử 50 file** và soát kỹ.
 
+**Cập nhật:** từ bản 0.3.3, khi có bản mới, phần mềm hiện dòng *"Đã có bản mới …"*. Bấm **Tải bản mới**, đóng phần mềm, rồi chạy file vừa tải. Không cần gỡ bản cũ; cấu hình và kết quả cũ được giữ nguyên. Người đang dùng bản 0.3.2 trở về trước cần tự tải bộ cài mới một lần.
+
 Hướng dẫn chi tiết, ý nghĩa từng tuỳ chọn và cách sửa tay: **[HUONG_DAN.md](HUONG_DAN.md)**.
 
 ## Chạy từ mã nguồn (Windows / macOS / Linux)
@@ -47,7 +49,12 @@ python tao_du_lieu_thu.py du_lieu_thu       # tạo 8 file scan giả để th�
 ## Lưu ý khi sử dụng
 
 - Đây là **công cụ hỗ trợ**. Kết quả, kể cả các file báo "Đạt", cần được người có trách nhiệm kiểm tra trước khi đưa lên hệ thống. Công cụ không thay thế việc rà soát theo quy định và không phải tư vấn pháp lý.
-- Công cụ chỉ kết nối mạng khi bạn bấm **Tải gói tiếng Việt** (tải từ kho chính thức của Tesseract trên GitHub) hoặc mở các trang tải về.
+- Công cụ chỉ kết nối mạng trong ba trường hợp:
+  - khi mở phần mềm, để **hỏi GitHub số phiên bản mới nhất** (chỉ gửi đúng yêu cầu này, tắt được bằng ô *Tự kiểm tra bản mới khi mở phần mềm*);
+  - khi bạn bấm **Tải gói tiếng Việt**;
+  - khi bạn mở các trang tải về.
+
+  Công cụ không gửi bất kỳ dữ liệu hồ sơ nào ra ngoài.
 - Tuỳ chọn *Lưu chữ OCR* tạo ra các file chứa dữ liệu cá nhân. Chỉ bật khi cần dò lỗi và nhớ xoá sau khi dùng.
 
 ## Góp ý và báo lỗi
