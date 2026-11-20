@@ -1,5 +1,7 @@
 ﻿# Đóng gói bản Windows: TachVanBan.exe + Tesseract + gói tiếng Việt (đã rút gọn), tự kiểm tra,
-# rồi xuất 2 dạng: bộ cài 1 file (Inno Setup, nén LZMA2) và bản zip chạy không cần cài.
+# rồi xuất 2 dạng: TachVanBan-CaiDat.exe (bộ cài 1 file, nén LZMA2) và TachVanBan-KhongCanCai.zip.
+# Tên file KHÔNG kèm số phiên bản để link "bản mới nhất" luôn cố định:
+#   https://github.com/phamngocson6596/tach-file-hoso/releases/latest/download/TachVanBan-CaiDat.exe
 #
 # Chạy trên máy Windows đã có Python (kèm: pip install -r requirements.txt pyinstaller),
 # Tesseract và Inno Setup 6:
@@ -86,7 +88,7 @@ $bang = foreach ($muc in (Get-ChildItem "$dich\_internal", "$dich\tesseract", "$
 $bang | Sort-Object MB -Descending | Select-Object -First 25 | Format-Table -AutoSize | Out-String | Write-Host
 
 # --- 7. Bản zip chạy không cần cài
-$zip = "dist\TachVanBan-$phienBan-windows-x64.zip"
+$zip = "dist\TachVanBan-KhongCanCai.zip"
 if (Test-Path $zip) { Remove-Item $zip }
 Compress-Archive -Path $dich -DestinationPath $zip -CompressionLevel Optimal
 
@@ -97,7 +99,7 @@ if (-not $BoQuaBoCai) {
     if (-not $iscc) { throw "Không tìm thấy Inno Setup 6 (ISCC.exe). Cài Inno Setup hoặc chạy với -BoQuaBoCai." }
     & $iscc /Qp "/DMyAppVersion=$phienBan" "packaging\TachVanBan.iss"
     if ($LASTEXITCODE -ne 0) { throw "Inno Setup lỗi" }
-    $setup = "dist\TachVanBan-$phienBan-cai-dat.exe"
+    $setup = "dist\TachVanBan-CaiDat.exe"
     if (-not $BoQuaKiemTra) {
         $caiThu = Join-Path $env:TEMP "tvb_cai_thu"
         if (Test-Path $caiThu) { Remove-Item $caiThu -Recurse -Force }
@@ -109,6 +111,6 @@ if (-not $BoQuaBoCai) {
 }
 
 Write-Host "== Xong. File phát hành:"
-Get-ChildItem "dist\TachVanBan-$phienBan-*" | ForEach-Object {
+Get-ChildItem "dist\TachVanBan-CaiDat.exe", "dist\TachVanBan-KhongCanCai.zip" -ErrorAction SilentlyContinue | ForEach-Object {
     Write-Host ("   {0,-50} {1,7:N1} MB" -f $_.Name, ($_.Length / 1MB))
 }

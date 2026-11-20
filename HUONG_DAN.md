@@ -15,8 +15,8 @@ Công cụ dành cho các tổ chức hành nghề công chứng có bản scan 
 
 Vào trang **Releases** của dự án trên GitHub và tải một trong hai file. Cả hai đều đã kèm sẵn Python, Tesseract và gói tiếng Việt.
 
-- **`TachVanBan-…-cai-dat.exe`** (khuyên dùng, file nhỏ nhất): chạy file, bấm Next. Mặc định cài cho riêng người dùng hiện tại nên **không cần quyền quản trị**. Sau khi cài có biểu tượng ở menu Start, gỡ được trong *Settings → Apps*.
-- **`TachVanBan-…-windows-x64.zip`**: giải nén ra một thư mục, ví dụ `D:\TachVanBan`, rồi chạy **`TachVanBan.exe`**.
+- **`TachVanBan-CaiDat.exe`** (khuyên dùng, file nhỏ nhất): chạy file, bấm Next. Mặc định cài cho riêng người dùng hiện tại nên **không cần quyền quản trị**. Sau khi cài có biểu tượng ở menu Start, gỡ được trong *Settings → Apps*.
+- **`TachVanBan-KhongCanCai.zip`** (dùng khi máy không cho cài phần mềm): giải nén ra một thư mục, ví dụ `D:\TachVanBan`, rồi chạy **`TachVanBan.exe`**.
 
 Nếu Windows báo *"Windows protected your PC"*, bấm **More info**, rồi **Run anyway**. Cảnh báo này hiện ra vì file chưa được ký số.
 

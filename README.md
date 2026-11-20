@@ -16,12 +16,14 @@ Công cụ đọc từng trang, nhận ra trang nào thuộc văn bản (từ ti
 
 ## Tải về và sử dụng (Windows)
 
-Vào trang **[Releases](../../releases)** và tải một trong hai file. Cả hai đều đã kèm sẵn Python, Tesseract và gói tiếng Việt, **không cần cài gì thêm**.
+### ⬇️ [Tải bộ cài (TachVanBan-CaiDat.exe)](https://github.com/phamngocson6596/tach-file-hoso/releases/latest/download/TachVanBan-CaiDat.exe)
+
+Link trên luôn trỏ tới bản mới nhất. Các bản trước xem ở trang **[Releases](../../releases)**. Bộ cài đã kèm sẵn Python, Tesseract và gói tiếng Việt, **không cần cài gì thêm**.
 
 | File | Dùng khi |
 |---|---|
-| **`TachVanBan-…-cai-dat.exe`** (khuyên dùng, nhỏ nhất) | Chạy file, bấm Next là xong. Có biểu tượng ở menu Start và có mục gỡ cài đặt. Mặc định cài cho riêng người dùng hiện tại, **không cần quyền quản trị**. |
-| `TachVanBan-…-windows-x64.zip` | Không muốn cài. Giải nén ra một thư mục rồi chạy `TachVanBan.exe`. |
+| **[`TachVanBan-CaiDat.exe`](https://github.com/phamngocson6596/tach-file-hoso/releases/latest/download/TachVanBan-CaiDat.exe)** (khuyên dùng, nhỏ nhất) | Chạy file, bấm Next là xong. Có biểu tượng ở menu Start và có mục gỡ cài đặt. Mặc định cài cho riêng người dùng hiện tại, **không cần quyền quản trị**. |
+| [`TachVanBan-KhongCanCai.zip`](https://github.com/phamngocson6596/tach-file-hoso/releases/latest/download/TachVanBan-KhongCanCai.zip) | Máy không cho cài phần mềm, hoặc muốn chạy từ USB. Giải nén ra một thư mục rồi chạy `TachVanBan.exe`. |
 
 1. Windows có thể hiện cảnh báo *"Windows protected your PC"* vì file chưa được ký số. Bấm **More info**, rồi **Run anyway**.
 2. Chọn thư mục PDF scan và thư mục kết quả, khai báo cấu trúc hồ sơ của đơn vị, rồi bấm **Bắt đầu tách**. Lần đầu nên **chạy thử 50 file** và soát kỹ.

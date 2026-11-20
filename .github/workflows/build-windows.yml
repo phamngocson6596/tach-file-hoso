@@ -1,6 +1,7 @@
 # Tự đóng gói bản Windows (kèm sẵn Python + Tesseract + gói tiếng Việt), xuất 2 dạng:
-#   TachVanBan-<phiên bản>-cai-dat.exe       bộ cài 1 file, nhỏ nhất, không cần quyền quản trị
-#   TachVanBan-<phiên bản>-windows-x64.zip   bản giải nén là chạy
+#   TachVanBan-CaiDat.exe        bộ cài 1 file, nhỏ nhất, không cần quyền quản trị
+#   TachVanBan-KhongCanCai.zip   bản giải nén là chạy
+# (tên không kèm phiên bản -> link .../releases/latest/download/TachVanBan-CaiDat.exe luôn trỏ bản mới nhất)
 # - Mỗi khi bấm "Publish release" trên GitHub: đóng gói, tự kiểm tra, rồi đính 2 file vào release đó.
 # - Hoặc chạy tay: tab Actions -> "Đóng gói bản Windows" -> Run workflow (file nằm ở mục Artifacts).
 name: Đóng gói bản Windows
@@ -45,15 +46,15 @@ jobs:
       - name: Lưu bộ cài
         uses: actions/upload-artifact@v4
         with:
-          name: TachVanBan-cai-dat
-          path: dist/TachVanBan-*-cai-dat.exe
+          name: TachVanBan-CaiDat
+          path: dist/TachVanBan-CaiDat.exe
           compression-level: 0
 
       - name: Lưu bản zip
         uses: actions/upload-artifact@v4
         with:
-          name: TachVanBan-windows-x64
-          path: dist/TachVanBan-*.zip
+          name: TachVanBan-KhongCanCai
+          path: dist/TachVanBan-KhongCanCai.zip
           compression-level: 0
 
       - name: Đính kèm vào release
@@ -61,4 +62,4 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" (Get-ChildItem dist/TachVanBan-*-cai-dat.exe, dist/TachVanBan-*.zip).FullName --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" dist/TachVanBan-CaiDat.exe dist/TachVanBan-KhongCanCai.zip --clobber
