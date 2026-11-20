@@ -53,6 +53,11 @@ def mb(ds) -> float:
 
 
 if __name__ == "__main__":
+    for luong in (sys.stdout, sys.stderr):  # cửa sổ lệnh/CI trên Windows có thể dùng bảng mã cp1252
+        try:
+            luong.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     if len(sys.argv) < 2:
         raise SystemExit(__doc__)
     thu_muc = Path(sys.argv[1])

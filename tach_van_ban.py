@@ -963,6 +963,11 @@ def chay_tach(vao, ra, cfg: dict, so_luong: int = 1, gioi_han: int = 0,
 
 
 def main():
+    for luong in (sys.stdout, sys.stderr):  # tránh lỗi in tiếng Việt khi chuyển hướng ra file trên Windows
+        try:
+            luong.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     md = cfg_mac_dinh()
     ap = argparse.ArgumentParser(description="Tách văn bản công chứng khỏi hồ sơ lưu trong PDF scan gộp.")
     ap.add_argument("vao", help="thư mục chứa PDF (quét cả thư mục con) hoặc 1 file PDF")
