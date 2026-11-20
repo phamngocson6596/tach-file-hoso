@@ -36,7 +36,7 @@ except ImportError:  # PyMuPDF bản cũ
     import fitz as pymupdf
 from PIL import Image
 
-PHIEN_BAN = "0.3.2"
+PHIEN_BAN = "0.3.3"
 
 # =====================================================================
 # 1. CHUẨN HOÁ CHỮ & TỪ KHOÁ
@@ -1015,6 +1015,34 @@ URL_TESSERACT = "https://github.com/UB-Mannheim/tesseract/wiki"
 URL_GOI_VIE = "https://github.com/tesseract-ocr/tessdata/raw/main/vie.traineddata"
 URL_TRANG_GOI = "https://github.com/tesseract-ocr/tessdata"
 URL_PYTHON = "https://www.python.org/downloads/windows/"
+KHO_GITHUB = "phamngocson6596/tach-file-hoso"
+URL_KHO = f"https://github.com/{KHO_GITHUB}"
+
+
+def _so_phien_ban(s: str) -> tuple:
+    return tuple(int(x) for x in re.findall(r"\d+", s or "")[:4])
+
+
+def la_ban_cai() -> bool:
+    """Đang chạy từ bản cài bằng bộ cài (có trình gỡ cài đặt cạnh file .exe)."""
+    return getattr(sys, "frozen", False) and (thu_muc_ung_dung() / "unins000.exe").exists()
+
+
+def kiem_tra_ban_moi(timeout: float = 6) -> dict | None:
+    """Hỏi GitHub số phiên bản của bản phát hành mới nhất. Chỉ gửi đúng yêu cầu này, không gửi dữ liệu nào khác.
+    Trả về thông tin bản mới nếu mới hơn bản đang dùng, None nếu đang là bản mới nhất. Lỗi mạng thì ném lỗi."""
+    import urllib.request
+    yc = urllib.request.Request(f"https://api.github.com/repos/{KHO_GITHUB}/releases/latest",
+                                headers={"User-Agent": f"TachVanBan/{PHIEN_BAN}",
+                                         "Accept": "application/vnd.github+json"})
+    with urllib.request.urlopen(yc, timeout=timeout) as r:
+        d = json.loads(r.read().decode("utf-8"))
+    tag = d.get("tag_name") or ""
+    if not _so_phien_ban(tag) or _so_phien_ban(tag) <= _so_phien_ban(PHIEN_BAN):
+        return None
+    tai = {a.get("name"): a.get("browser_download_url") for a in d.get("assets", [])}
+    return dict(phien_ban=tag.lstrip("vV"), trang=d.get("html_url") or f"{URL_KHO}/releases/latest",
+                tai_cai_dat=tai.get("TachVanBan-CaiDat.exe"), tai_zip=tai.get("TachVanBan-KhongCanCai.zip"))
 
 
 def thu_muc_goi_rieng() -> Path:

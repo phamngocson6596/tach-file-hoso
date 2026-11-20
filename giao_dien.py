@@ -86,6 +86,7 @@ class UngDung(tk.Tk):
         self._nap_cau_hinh()
         self.after(100, self._doc_hang_doi)
         self.after(300, self.kiem_tra_ocr)
+        self.after(1500, lambda: self.v["kiem_tra_cap_nhat"].get() and self.kiem_tra_cap_nhat(tu_dong=True))
         self.protocol("WM_DELETE_WINDOW", self._dong)
 
     # ------------------------------------------------------------------ giao diện
@@ -120,6 +121,7 @@ class UngDung(tk.Tk):
             xem_tat_ca=tk.BooleanVar(value=False),
             luu_chu=tk.BooleanVar(value=False),
             gioi_han=tk.StringVar(value="0"),
+            kiem_tra_cap_nhat=tk.BooleanVar(value=True),
         )
 
     def _dung_giao_dien(self):
@@ -133,11 +135,33 @@ class UngDung(tk.Tk):
         dau.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
         ttk.Label(dau, text="Tách văn bản công chứng khỏi hồ sơ lưu", font=("Segoe UI", 14, "bold")).pack(side="left")
         ttk.Label(dau, text="   Chạy hoàn toàn trên máy này · không gửi dữ liệu ra ngoài", style="Goiy.TLabel").pack(side="left")
+        w = ttk.Button(dau, text="Kiểm tra bản mới", command=lambda: self.kiem_tra_cap_nhat(tu_dong=False))
+        w.pack(side="right")
+        ttk.Label(dau, text=f"Phiên bản {self.tvb.PHIEN_BAN}", style="Goiy.TLabel").pack(side="right", padx=8)
+        # dải báo bản mới: chỉ hiện khi GitHub có bản phát hành mới hơn
+        self.dai_moi = tk.Frame(goc, bg="#dcfce7", highlightbackground="#86efac", highlightthickness=1)
+        # nút đóng gói trước để luôn đủ chỗ, chữ co lại nếu cửa sổ hẹp
+        ttk.Button(self.dai_moi, text="Ẩn", width=5, command=self.dai_moi.grid_remove).pack(side="right", padx=6, pady=4)
+        ttk.Button(self.dai_moi, text="Xem có gì mới", command=lambda: webbrowser.open(self._ban_moi["trang"])) \
+            .pack(side="right", padx=(0, 4), pady=4)
+        ttk.Button(self.dai_moi, text="⬇ Tải bản mới", command=self._tai_ban_moi).pack(side="right", padx=4, pady=4)
+        self.lb_moi = tk.Label(self.dai_moi, text="", bg="#dcfce7", fg="#14532d", font=("Segoe UI", 10, "bold"))
+        self.lb_moi.pack(side="left", padx=10, pady=6)
+        w = tk.Label(self.dai_moi, text="Tải về rồi chạy file vừa tải để cập nhật (đóng phần mềm này trước).",
+                     bg="#dcfce7", fg="#166534", anchor="w")
+        w.pack(side="left", fill="x", expand=True)
+        GoiY(w, "Không cần gỡ bản cũ: bộ cài tự ghi đè lên bản đang dùng. "
+                "Cấu hình, gói tiếng Việt và thư mục kết quả cũ được giữ nguyên.")
+        self._ban_moi = None
 
+        self.dai_moi.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        self.dai_moi.grid_remove()
+        goc.rowconfigure(1, weight=0)
+        goc.rowconfigure(2, weight=1)
         trai = ttk.Frame(goc)
-        trai.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
+        trai.grid(row=2, column=0, sticky="nsew", padx=(0, 10))
         phai = ttk.Frame(goc)
-        phai.grid(row=1, column=1, sticky="nsew")
+        phai.grid(row=2, column=1, sticky="nsew")
         self._khung_thu_muc(trai)
         self._khung_cau_truc(trai)
         self._khung_ocr(trai)
@@ -280,6 +304,11 @@ class UngDung(tk.Tk):
         ttk.Label(r, text="Chỉ chạy thử").pack(side="left")
         ttk.Spinbox(r, from_=0, to=100000, textvariable=self.v["gioi_han"], width=7).pack(side="left", padx=4)
         ttk.Label(r, text="file đầu tiên (0 = tất cả)", style="Goiy.TLabel").pack(side="left")
+        w = ttk.Checkbutton(f, text="Tự kiểm tra bản mới khi mở phần mềm", variable=self.v["kiem_tra_cap_nhat"])
+        w.grid(row=4, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        GoiY(w, "Khi mở, phần mềm hỏi GitHub số phiên bản mới nhất để báo nếu có bản mới. "
+                "Chỉ gửi đúng yêu cầu này, không gửi bất kỳ dữ liệu hồ sơ nào. Bỏ tick nếu muốn phần mềm "
+                "hoàn toàn không kết nối mạng.")
 
     def _khung_chay(self, cha):
         cha.rowconfigure(4, weight=1)
@@ -385,6 +414,25 @@ class UngDung(tk.Tk):
         ok, tb = self.tvb.kiem_tra_ocr(self._cfg())
         self.lb_ocr.configure(text=("✔ " if ok else "✖ ") + tb, foreground="#15803d" if ok else "#b91c1c")
         return ok
+
+    def kiem_tra_cap_nhat(self, tu_dong: bool):
+        def chay():
+            try:
+                self.q.put(("ban_moi", (tu_dong, self.tvb.kiem_tra_ban_moi(), None)))
+            except Exception as e:
+                self.q.put(("ban_moi", (tu_dong, None, str(e))))
+
+        threading.Thread(target=chay, daemon=True).start()
+
+    def _tai_ban_moi(self):
+        b = self._ban_moi or {}
+        if self.tvb.la_ban_cai():
+            link = b.get("tai_cai_dat")
+        elif getattr(sys, "frozen", False):
+            link = b.get("tai_zip")
+        else:
+            link = None  # chạy từ mã nguồn: mở trang phát hành
+        webbrowser.open(link or b.get("trang") or self.tvb.URL_KHO + "/releases/latest")
 
     def tai_goi(self):
         self.nut_tai_goi.configure(state="disabled")
@@ -519,6 +567,19 @@ class UngDung(tk.Tk):
                     if (Path(self.v["ra"].get()) / "xem_lai.html").exists() and self._dem_hien and any(self._dem_hien.values()):
                         if messagebox.askyesno("Xong", "Đã tách xong. Mở trang xem lại?"):
                             self._mo_ket_qua("xem_lai.html")
+                elif loai == "ban_moi":
+                    tu_dong, ban, loi = gt
+                    if ban:
+                        self._ban_moi = ban
+                        self.lb_moi.configure(text=f"🔔 Đã có bản mới {ban['phien_ban']} "
+                                                   f"(đang dùng {self.tvb.PHIEN_BAN})")
+                        self.dai_moi.grid()
+                    elif not tu_dong and loi:
+                        messagebox.showwarning("Không kiểm tra được",
+                                               f"Không kết nối được tới GitHub để kiểm tra bản mới:\n{loi}\n\n"
+                                               f"Có thể xem trực tiếp tại {self.tvb.URL_KHO}/releases")
+                    elif not tu_dong:
+                        messagebox.showinfo("Bản mới nhất", f"Bạn đang dùng bản mới nhất ({self.tvb.PHIEN_BAN}).")
                 elif loai in ("goi_xong", "goi_loi"):
                     self.nut_tai_goi.configure(state="normal")
                     if loai == "goi_loi":
