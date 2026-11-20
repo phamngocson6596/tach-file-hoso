@@ -1430,7 +1430,7 @@ def kiem_tra_ocr(cfg: dict) -> tuple[bool, str]:
         import importlib.util
         if importlib.util.find_spec("locro"):
             return True, "Đã có thư viện locro (Screen AI của Chrome)."
-        return False, "Chưa cài thư viện locro cho Screen AI (xem HUONG_DAN.md mục 7)."
+        return False, "Chưa cài thư viện locro cho Screen AI (xem HUONG_DAN.md mục 6)."
     try:
         import pytesseract
     except ImportError:
