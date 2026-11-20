@@ -1,0 +1,616 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Giao diện cho tach_van_ban.py — tách văn bản công chứng khỏi hồ sơ lưu trong PDF scan gộp.
+Chạy:  python giao_dien.py   (Windows: bấm đúp chay_giao_dien.bat)
+"""
+from __future__ import annotations
+
+import json
+import multiprocessing
+import os
+import queue
+import subprocess
+import sys
+import threading
+import tkinter as tk
+import webbrowser
+from pathlib import Path
+from tkinter import filedialog, messagebox, ttk
+from tkinter.scrolledtext import ScrolledText
+
+# Bản .exe không có cửa sổ dòng lệnh: sys.stdout/stderr = None, mọi lệnh print sẽ lỗi -> chuyển vào "hố đen".
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
+THU_MUC = Path(__file__).resolve().parent
+sys.path.insert(0, str(THU_MUC))
+F_CAU_HINH = Path.home() / ".tach_van_ban_cauhinh.json"
+
+ENGINE = {"Tesseract (khuyên dùng)": "tesseract", "Screen AI của Chrome (thử nghiệm)": "screenai"}
+VI_TRI = {"Không cố định": "tu_dong", "Đầu file": "dau", "Cuối file": "cuoi"}
+NHAN_TT = {"DAT": ("Đạt", "#15803d"), "CAN_KIEM_TRA": ("Cần kiểm tra", "#b45309"),
+           "KHONG_THAY": ("Không thấy", "#b91c1c"), "LOI": ("Lỗi", "#7f1d1d")}
+
+
+def mo(duong_dan):
+    duong_dan = str(duong_dan)
+    if not os.path.exists(duong_dan):
+        messagebox.showinfo("Chưa có", f"Chưa có:\n{duong_dan}\n\nHãy chạy tách trước.")
+        return
+    if sys.platform == "win32":
+        os.startfile(duong_dan)  # noqa
+    elif sys.platform == "darwin":
+        subprocess.Popen(["open", duong_dan])
+    else:
+        subprocess.Popen(["xdg-open", duong_dan])
+
+
+class GoiY:
+    """Chú thích hiện khi rê chuột."""
+
+    def __init__(self, w, text):
+        self.w, self.text, self.tip = w, text, None
+        w.bind("<Enter>", self.hien)
+        w.bind("<Leave>", self.an)
+
+    def hien(self, _):
+        x, y = self.w.winfo_rootx() + 20, self.w.winfo_rooty() + self.w.winfo_height() + 4
+        self.tip = tk.Toplevel(self.w)
+        self.tip.wm_overrideredirect(True)
+        self.tip.wm_geometry(f"+{x}+{y}")
+        tk.Label(self.tip, text=self.text, justify="left", background="#fffbe6", relief="solid", borderwidth=1,
+                 wraplength=380, padx=6, pady=4).pack()
+
+    def an(self, _):
+        if self.tip:
+            self.tip.destroy()
+            self.tip = None
+
+
+class UngDung(tk.Tk):
+    def __init__(self, tvb):
+        super().__init__()
+        self.tvb = tvb
+        self.title(f"Tách văn bản công chứng · {tvb.PHIEN_BAN}")
+        self.geometry("1180x780")
+        self.minsize(1000, 680)
+        self.q = queue.Queue()
+        self.dung = threading.Event()
+        self.luong = None
+        self._kieu()
+        self._bien()
+        self._dung_giao_dien()
+        self._nap_cau_hinh()
+        self.after(100, self._doc_hang_doi)
+        self.after(300, self.kiem_tra_ocr)
+        self.protocol("WM_DELETE_WINDOW", self._dong)
+
+    # ------------------------------------------------------------------ giao diện
+    def _kieu(self):
+        st = ttk.Style(self)
+        if "vista" in st.theme_names():
+            st.theme_use("vista")
+        elif "clam" in st.theme_names():
+            st.theme_use("clam")
+            st.configure("Horizontal.TProgressbar", background="#16a34a")
+        st.configure("TLabelframe.Label", font=("Segoe UI", 10, "bold"))
+        st.configure("Goiy.TLabel", foreground="#6b7280")
+        st.configure("Lon.TButton", font=("Segoe UI", 11, "bold"), padding=(14, 6))
+
+    def _bien(self):
+        md = self.tvb.cfg_mac_dinh()
+        self.v = dict(
+            vao=tk.StringVar(), ra=tk.StringVar(),
+            mot_van_ban=tk.StringVar(value="mot" if md["mot_van_ban"] else "nhieu"),
+            vi_tri=tk.StringVar(value="Không cố định"),
+            so_cc_trong_ten=tk.BooleanVar(value=md["so_cc_trong_ten"]),
+            uu_tien_ngay_moi=tk.BooleanVar(value=md["uu_tien_ngay_moi"]),
+            ten_to_chuc=tk.StringVar(value=md["ten_to_chuc"]),
+            can_quoc_hieu=tk.BooleanVar(value=md["can_quoc_hieu"]),
+            giu_trang_trang=tk.BooleanVar(value=md["giu_trang_trang"]),
+            engine=tk.StringVar(value="Tesseract (khuyên dùng)"),
+            dpi=tk.StringVar(value=str(md["dpi"])),
+            so_luong=tk.StringVar(value=str(max(1, (os.cpu_count() or 2) - 1))),
+            tesseract=tk.StringVar(value=self.tvb.tim_tesseract() or ""),
+            luon_ocr=tk.BooleanVar(value=False),
+            xuat_ho_so=tk.BooleanVar(value=False),
+            xem_tat_ca=tk.BooleanVar(value=False),
+            luu_chu=tk.BooleanVar(value=False),
+            gioi_han=tk.StringVar(value="0"),
+        )
+
+    def _dung_giao_dien(self):
+        goc = ttk.Frame(self, padding=10)
+        goc.pack(fill="both", expand=True)
+        goc.columnconfigure(0, weight=0, minsize=560)
+        goc.columnconfigure(1, weight=1)
+        goc.rowconfigure(1, weight=1)
+
+        dau = ttk.Frame(goc)
+        dau.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 8))
+        ttk.Label(dau, text="Tách văn bản công chứng khỏi hồ sơ lưu", font=("Segoe UI", 14, "bold")).pack(side="left")
+        ttk.Label(dau, text="   Chạy hoàn toàn trên máy này · không gửi dữ liệu ra ngoài", style="Goiy.TLabel").pack(side="left")
+
+        trai = ttk.Frame(goc)
+        trai.grid(row=1, column=0, sticky="nsew", padx=(0, 10))
+        phai = ttk.Frame(goc)
+        phai.grid(row=1, column=1, sticky="nsew")
+        self._khung_thu_muc(trai)
+        self._khung_cau_truc(trai)
+        self._khung_ocr(trai)
+        self._khung_chay(phai)
+
+    def _o_chon(self, cha, hang, nhan, bien, lenh, goi_y=None):
+        ttk.Label(cha, text=nhan).grid(row=hang, column=0, sticky="w", pady=2)
+        e = ttk.Entry(cha, textvariable=bien)
+        e.grid(row=hang, column=1, sticky="ew", padx=4, pady=2)
+        ttk.Button(cha, text="Chọn…", command=lenh, width=7).grid(row=hang, column=2, pady=2)
+        if goi_y:
+            GoiY(e, goi_y)
+        return e
+
+    def _khung_thu_muc(self, cha):
+        f = ttk.LabelFrame(cha, text="1. Thư mục", padding=8)
+        f.pack(fill="x", pady=(0, 8))
+        f.columnconfigure(1, weight=1)
+        self._o_chon(f, 0, "PDF scan (đầu vào):", self.v["vao"], self.chon_vao,
+                     "Thư mục chứa các file PDF scan gộp. Quét cả các thư mục con.")
+        self._o_chon(f, 1, "Kết quả (đầu ra):", self.v["ra"], self.chon_ra,
+                     "Nơi ghi văn bản đã tách, bảng báo cáo và trang xem lại. Nên là thư mục riêng.")
+        self.lb_dem = ttk.Label(f, text="", style="Goiy.TLabel")
+        self.lb_dem.grid(row=2, column=1, sticky="w", padx=4)
+
+    def _khung_cau_truc(self, cha):
+        f = ttk.LabelFrame(cha, text="2. Cấu trúc hồ sơ của đơn vị", padding=8)
+        f.pack(fill="x", pady=(0, 8))
+        f.columnconfigure(1, weight=1)
+        ttk.Label(f, text="Giúp phân biệt văn bản công chứng với bản sao hợp đồng cũ lưu trong hồ sơ.",
+                  style="Goiy.TLabel").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 4))
+
+        ttk.Label(f, text="Mỗi file scan chứa:").grid(row=1, column=0, sticky="nw", pady=2)
+        r = ttk.Frame(f)
+        r.grid(row=1, column=1, columnspan=2, sticky="w")
+        a = ttk.Radiobutton(r, text="Một văn bản công chứng (văn bản khác trong file coi là hồ sơ)",
+                            variable=self.v["mot_van_ban"], value="mot")
+        a.pack(anchor="w")
+        b = ttk.Radiobutton(r, text="Có thể nhiều văn bản công chứng — tách riêng từng văn bản",
+                            variable=self.v["mot_van_ban"], value="nhieu")
+        b.pack(anchor="w")
+        GoiY(a, "Thường gặp: 1 file = 1 số công chứng. Nếu file có nhiều văn bản, công cụ chấm điểm theo các "
+                "dấu hiệu bên dưới để chọn 1 văn bản chính; phần còn lại để ở hồ sơ.")
+        GoiY(b, "Dùng khi đơn vị scan nhiều giao dịch vào chung 1 file. Mỗi văn bản được cắt thành file riêng "
+                "(…__vb1.pdf, …__vb2.pdf). Văn bản có dấu hiệu là bản sao lưu trong hồ sơ (theo các ô bên dưới) "
+                "bị loại ra.")
+
+        ttk.Separator(f).grid(row=2, column=0, columnspan=3, sticky="ew", pady=6)
+        ttk.Label(f, text="Dấu hiệu nhận ra văn bản của đơn vị — để loại bản sao văn bản cũ lưu lẫn trong hồ sơ:",
+                  style="Goiy.TLabel").grid(row=3, column=0, columnspan=3, sticky="w")
+        ttk.Label(f, text="Văn bản nằm ở:").grid(row=4, column=0, sticky="w", pady=2)
+        r = ttk.Frame(f)
+        r.grid(row=4, column=1, columnspan=2, sticky="w")
+        for ten in VI_TRI:
+            w = ttk.Radiobutton(r, text=ten, variable=self.v["vi_tri"], value=ten)
+            w.pack(side="left", padx=(0, 12))
+            GoiY(w, "Một văn bản/file: văn bản đầu tiên (hoặc cuối cùng) được ưu tiên.\n"
+                    "Nhiều văn bản/file: chỉ giữ các văn bản xếp liền nhau ở đầu (hoặc cuối) file; văn bản nằm sau "
+                    "trang hồ sơ bị coi là bản sao. Chỉ chọn khi đơn vị luôn xếp hết văn bản lên trước (hoặc ra sau) "
+                    "hồ sơ — nếu xếp xen kẽ (VB1, hồ sơ 1, VB2, hồ sơ 2) thì để Không cố định.")
+        w = ttk.Checkbutton(f, text="Số công chứng có trong tên file/thư mục (vd 2022_1234.pdf, 1234_1235.pdf)",
+                            variable=self.v["so_cc_trong_ten"])
+        w.grid(row=5, column=0, columnspan=3, sticky="w", pady=2)
+        GoiY(w, "Đọc dòng 'Số công chứng …' trong lời chứng và so với các con số trong tên file, tên thư mục. "
+                "Khớp: là văn bản của đơn vị. Đọc được số mà không khớp: là bản sao trong hồ sơ. "
+                "Đây là dấu hiệu mạnh nhất nếu đơn vị đặt tên file theo số công chứng.")
+        w = ttk.Checkbutton(f, text="Ngày công chứng mới nhất (cũ hơn quá 30 ngày coi là bản sao trong hồ sơ)",
+                            variable=self.v["uu_tien_ngay_moi"])
+        w.grid(row=6, column=0, columnspan=3, sticky="w", pady=2)
+        GoiY(w, "So ngày ghi trong lời chứng của các văn bản trong cùng file. Văn bản cũ hơn văn bản mới nhất quá "
+                "30 ngày bị coi là bản sao lưu trong hồ sơ. Các giao dịch cùng ngày hoặc gần ngày đều được giữ.")
+        ttk.Label(f, text="Tên tổ chức:").grid(row=7, column=0, sticky="w", pady=2)
+        w = ttk.Entry(f, textvariable=self.v["ten_to_chuc"])
+        w.grid(row=7, column=1, columnspan=2, sticky="ew", padx=4, pady=2)
+        GoiY(w, "Tên tổ chức hành nghề công chứng của đơn vị, vd: Văn phòng công chứng Hòa An. "
+                "Lời chứng ghi đúng tên này: văn bản của đơn vị. Ghi tên văn phòng/phòng công chứng khác: bản sao "
+                "trong hồ sơ. Để trống nếu không dùng.")
+
+        ttk.Separator(f).grid(row=8, column=0, columnspan=3, sticky="ew", pady=6)
+        w = ttk.Checkbutton(f, text="Văn bản luôn có Quốc hiệu (bỏ tick nếu có loại văn bản không có Quốc hiệu)",
+                            variable=self.v["can_quoc_hieu"])
+        w.grid(row=9, column=0, columnspan=3, sticky="w", pady=2)
+        w = ttk.Checkbutton(f, text="Giữ trang trắng nằm giữa văn bản (mặc định bỏ đi)", variable=self.v["giu_trang_trang"])
+        w.grid(row=10, column=0, columnspan=3, sticky="w", pady=2)
+        GoiY(w, "Bật nếu cần giữ đúng số tờ như bản scan (vd scan 2 mặt có mặt sau trắng).")
+
+    def _khung_ocr(self, cha):
+        f = ttk.LabelFrame(cha, text="3. Đọc chữ (OCR)", padding=8)
+        f.pack(fill="x", pady=(0, 8))
+        f.columnconfigure(1, weight=1)
+        r = ttk.Frame(f)
+        r.grid(row=0, column=0, columnspan=3, sticky="w", pady=2)
+        ttk.Label(r, text="Công cụ:").pack(side="left")
+        cb = ttk.Combobox(r, textvariable=self.v["engine"], values=list(ENGINE), state="readonly", width=30)
+        cb.pack(side="left", padx=(4, 14))
+        cb.bind("<<ComboboxSelected>>", lambda e: self.kiem_tra_ocr())
+        ttk.Label(r, text="Độ nét:").pack(side="left")
+        w = ttk.Combobox(r, textvariable=self.v["dpi"], values=["150", "200", "300"], state="readonly", width=5)
+        w.pack(side="left", padx=(4, 2))
+        GoiY(w, "200 là đủ cho hầu hết bản scan. Tăng lên 300 nếu chữ nhỏ hoặc bản scan mờ (chậm hơn).")
+        ttk.Label(r, text="dpi    Song song:").pack(side="left")
+        w = ttk.Spinbox(r, from_=1, to=max(1, os.cpu_count() or 1), textvariable=self.v["so_luong"], width=4)
+        w.pack(side="left", padx=4)
+        GoiY(w, "Số file xử lý cùng lúc. Mặc định = số nhân CPU − 1. Giảm xuống nếu máy bị chậm khi đang chạy.")
+
+        self._o_chon(f, 1, "Tesseract:", self.v["tesseract"], self.chon_tesseract,
+                     "Đường dẫn tới tesseract.exe. Thường tự tìm thấy nếu cài vào C:\\Program Files\\Tesseract-OCR.")
+        r = ttk.Frame(f)
+        r.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(2, 0))
+        ttk.Button(r, text="Kiểm tra", command=self.kiem_tra_ocr).pack(side="left")
+        w = ttk.Button(r, text="Tải Tesseract…", command=lambda: webbrowser.open(self.tvb.URL_TESSERACT))
+        w.pack(side="left", padx=(6, 0))
+        GoiY(w, "Mở trang tải bộ cài Tesseract cho Windows (UB Mannheim). Khi cài, ở mục Additional language "
+                "data nhớ tick Vietnamese — hoặc bấm 'Tải gói tiếng Việt' sau khi cài.")
+        self.nut_tai_goi = ttk.Button(r, text="Tải gói tiếng Việt", command=self.tai_goi)
+        self.nut_tai_goi.pack(side="left", padx=(6, 0))
+        GoiY(self.nut_tai_goi, "Tự tải mô hình tiếng Việt (vie.traineddata, ~0,5 MB) từ kho chính thức của Tesseract "
+                               "về thư mục riêng của bạn — không cần quyền quản trị, không cần cài lại Tesseract.")
+        w = ttk.Button(r, text="Tải thủ công…", command=lambda: webbrowser.open(self.tvb.URL_TRANG_GOI))
+        w.pack(side="left", padx=(6, 0))
+        GoiY(w, "Mở kho mô hình ngôn ngữ của Tesseract nếu máy không tải tự động được (vd mạng cơ quan chặn). "
+                "Tải vie.traineddata rồi chép vào:\n" + str(self.tvb.thu_muc_goi_rieng()))
+        self.lb_ocr = ttk.Label(f, text="", wraplength=520)
+        self.lb_ocr.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        ttk.Checkbutton(f, text="OCR lại cả trang đã có sẵn lớp chữ (khi lớp chữ do máy scan tạo bị sai)",
+                        variable=self.v["luon_ocr"]).grid(row=4, column=0, columnspan=3, sticky="w", pady=(4, 0))
+
+    def _khung_dau_ra(self, cha, hang):
+        f = ttk.LabelFrame(cha, text="4. Đầu ra", padding=8)
+        f.grid(row=hang, column=0, sticky="ew", pady=(0, 8))
+        ttk.Checkbutton(f, text="Xuất thêm phần hồ sơ còn lại (thư mục ho_so)", variable=self.v["xuat_ho_so"]) \
+            .grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Checkbutton(f, text="Ảnh thu nhỏ cho cả file đạt (để soát kỹ khi chạy thử)", variable=self.v["xem_tat_ca"]) \
+            .grid(row=1, column=0, columnspan=3, sticky="w")
+        w = ttk.Checkbutton(f, text="Lưu chữ OCR để dò lỗi (thư mục chu_ocr — có dữ liệu cá nhân)",
+                            variable=self.v["luu_chu"])
+        w.grid(row=2, column=0, columnspan=3, sticky="w")
+        r = ttk.Frame(f)
+        r.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        ttk.Label(r, text="Chỉ chạy thử").pack(side="left")
+        ttk.Spinbox(r, from_=0, to=100000, textvariable=self.v["gioi_han"], width=7).pack(side="left", padx=4)
+        ttk.Label(r, text="file đầu tiên (0 = tất cả)", style="Goiy.TLabel").pack(side="left")
+
+    def _khung_chay(self, cha):
+        cha.rowconfigure(4, weight=1)
+        cha.columnconfigure(0, weight=1)
+        self._khung_dau_ra(cha, 0)
+        r = ttk.Frame(cha)
+        r.grid(row=1, column=0, sticky="ew")
+        self.nut_chay = ttk.Button(r, text="▶  Bắt đầu tách", style="Lon.TButton", command=self.bat_dau)
+        self.nut_chay.pack(side="left")
+        self.nut_dung = ttk.Button(r, text="■  Dừng", command=self.dung_lai, state="disabled")
+        self.nut_dung.pack(side="left", padx=8)
+
+        r = ttk.Frame(cha)
+        r.grid(row=2, column=0, sticky="ew", pady=(10, 2))
+        r.columnconfigure(0, weight=1)
+        self.tien_do = ttk.Progressbar(r, mode="determinate")
+        self.tien_do.grid(row=0, column=0, sticky="ew")
+        self.lb_tien_do = ttk.Label(r, text="Chưa chạy", width=22, anchor="e")
+        self.lb_tien_do.grid(row=0, column=1, padx=(8, 0))
+
+        r = ttk.Frame(cha)
+        r.grid(row=3, column=0, sticky="w", pady=(4, 6))
+        self.lb_dem_tt = {}
+        for k, (ten, mau) in NHAN_TT.items():
+            o = tk.Label(r, text=f"{ten}: 0", fg="white", bg=mau, padx=8, pady=2, font=("Segoe UI", 9, "bold"))
+            o.pack(side="left", padx=(0, 6))
+            self.lb_dem_tt[k] = (o, ten)
+
+        self.nhat_ky = ScrolledText(cha, height=8, font=("Consolas", 9), wrap="none", state="disabled")
+        self.nhat_ky.grid(row=4, column=0, sticky="nsew")
+
+        r = ttk.Frame(cha)
+        r.grid(row=5, column=0, sticky="ew", pady=(8, 0))
+        ttk.Button(r, text="Mở trang xem lại", command=lambda: self._mo_ket_qua("xem_lai.html")).pack(side="left")
+        ttk.Button(r, text="Mở bảng Excel", command=lambda: self._mo_ket_qua("bao_cao.xlsx")).pack(side="left", padx=6)
+        ttk.Button(r, text="Mở thư mục kết quả", command=lambda: self._mo_ket_qua("")).pack(side="left")
+
+        f = ttk.LabelFrame(cha, text="5. Sau khi soát lại", padding=8)
+        f.grid(row=6, column=0, sticky="ew", pady=(10, 0))
+        lb = ttk.Label(f, text="Sửa cột trang_van_ban trong bao_cao.xlsx cho các file sai (vd 3-7; nhiều văn bản: "
+                               "3-7;12-15; bỏ qua: BO), lưu lại rồi bấm nút dưới. Bộ file cuối cùng để tải lên nằm "
+                               "ở thư mục chot.", justify="left")
+        lb.pack(anchor="w", fill="x")
+        lb.bind("<Configure>", lambda e: lb.configure(wraplength=max(200, e.width - 8)))
+        self.nut_chot = ttk.Button(f, text="Cắt bản chốt theo bảng Excel", command=self.cat_chot)
+        self.nut_chot.pack(anchor="w", pady=(6, 0))
+
+    # ------------------------------------------------------------------ thao tác
+    def chon_vao(self):
+        d = filedialog.askdirectory(title="Chọn thư mục chứa PDF scan", initialdir=self.v["vao"].get() or None)
+        if d:
+            self.v["vao"].set(d)
+            if not self.v["ra"].get():
+                self.v["ra"].set(str(Path(d).parent / (Path(d).name + "_ket_qua")))
+            self._dem_file()
+
+    def chon_ra(self):
+        d = filedialog.askdirectory(title="Chọn thư mục ghi kết quả", initialdir=self.v["ra"].get() or None)
+        if d:
+            self.v["ra"].set(d)
+
+    def chon_tesseract(self):
+        f = filedialog.askopenfilename(title="Chọn tesseract.exe",
+                                       filetypes=[("tesseract", "tesseract*"), ("Tất cả", "*")])
+        if f:
+            self.v["tesseract"].set(f)
+            self.kiem_tra_ocr()
+
+    def _dem_file(self):
+        vao, ra = self.v["vao"].get(), self.v["ra"].get() or "__khong_co__"
+
+        def dem():
+            try:
+                n = len(self.tvb.liet_ke_pdf(vao, ra))
+                self.q.put(("dem", f"Tìm thấy {n} file PDF"))
+            except Exception as e:
+                self.q.put(("dem", f"Không đọc được thư mục: {e}"))
+
+        self.lb_dem.configure(text="Đang đếm file…")
+        threading.Thread(target=dem, daemon=True).start()
+
+    def _cfg(self) -> dict:
+        v = self.v
+        cfg = self.tvb.cfg_mac_dinh()
+        cfg.update(
+            mot_van_ban=v["mot_van_ban"].get() == "mot", vi_tri=VI_TRI[v["vi_tri"].get()],
+            so_cc_trong_ten=v["so_cc_trong_ten"].get(), uu_tien_ngay_moi=v["uu_tien_ngay_moi"].get(),
+            ten_to_chuc=v["ten_to_chuc"].get().strip(), can_quoc_hieu=v["can_quoc_hieu"].get(),
+            giu_trang_trang=v["giu_trang_trang"].get(), engine=ENGINE[v["engine"].get()],
+            dpi=int(v["dpi"].get() or 200), tesseract=v["tesseract"].get().strip() or None,
+            luon_ocr=v["luon_ocr"].get(), xuat_ho_so=v["xuat_ho_so"].get(), xem_tat_ca=v["xem_tat_ca"].get(),
+            luu_chu=v["luu_chu"].get(),
+        )
+        return cfg
+
+    def kiem_tra_ocr(self):
+        ok, tb = self.tvb.kiem_tra_ocr(self._cfg())
+        self.lb_ocr.configure(text=("✔ " if ok else "✖ ") + tb, foreground="#15803d" if ok else "#b91c1c")
+        return ok
+
+    def tai_goi(self):
+        self.nut_tai_goi.configure(state="disabled")
+        self.lb_ocr.configure(text="Đang tải gói tiếng Việt…", foreground="#374151")
+
+        def chay():
+            try:
+                self.tvb.tai_goi_tieng_viet(log=lambda s: self.q.put(("log", s)))
+                self.q.put(("goi_xong", None))
+            except Exception as e:
+                self.q.put(("log", f"LỖI tải gói: {e}"))
+                self.q.put(("goi_loi", str(e)))
+
+        threading.Thread(target=chay, daemon=True).start()
+
+    def _ghi(self, s):
+        self.nhat_ky.configure(state="normal")
+        self.nhat_ky.insert("end", s + "\n")
+        self.nhat_ky.see("end")
+        self.nhat_ky.configure(state="disabled")
+
+    def _dang_chay(self, co):
+        self.nut_chay.configure(state="disabled" if co else "normal")
+        self.nut_chot.configure(state="disabled" if co else "normal")
+        self.nut_dung.configure(state="normal" if co else "disabled")
+
+    def bat_dau(self):
+        vao, ra = self.v["vao"].get().strip(), self.v["ra"].get().strip()
+        if not vao or not os.path.exists(vao):
+            messagebox.showwarning("Thiếu thư mục", "Hãy chọn thư mục chứa PDF scan.")
+            return
+        if not ra:
+            messagebox.showwarning("Thiếu thư mục", "Hãy chọn thư mục ghi kết quả.")
+            return
+        if Path(ra).resolve() == Path(vao).resolve():
+            messagebox.showwarning("Trùng thư mục", "Thư mục kết quả phải khác thư mục đầu vào.")
+            return
+        if not self.kiem_tra_ocr():
+            messagebox.showerror("Chưa sẵn sàng", self.lb_ocr.cget("text"))
+            return
+        cfg = self._cfg()
+        if cfg["luu_chu"] and not messagebox.askyesno(
+                "Lưu chữ OCR", "Thư mục chu_ocr sẽ chứa toàn bộ chữ đọc được từ hồ sơ (họ tên, số giấy tờ…).\n"
+                               "Chỉ bật khi cần dò lỗi và nhớ xoá sau khi dùng. Tiếp tục?"):
+            return
+        self._luu_cau_hinh()
+        try:
+            so_luong = max(1, int(self.v["so_luong"].get()))
+            gioi_han = max(0, int(self.v["gioi_han"].get() or 0))
+        except ValueError:
+            messagebox.showwarning("Sai số", "Số luồng và số file chạy thử phải là số nguyên.")
+            return
+        self.dung.clear()
+        self.tien_do.configure(value=0, maximum=1)
+        self.lb_tien_do.configure(text="Đang chuẩn bị…")
+        for o, ten in self.lb_dem_tt.values():
+            o.configure(text=f"{ten}: 0")
+        self._dem_hien = {k: 0 for k in NHAN_TT}
+        self._dang_chay(True)
+
+        def chay():
+            try:
+                self.tvb.chay_tach(vao, ra, cfg, so_luong=so_luong, gioi_han=gioi_han,
+                                   log=lambda s: self.q.put(("log", s)),
+                                   tien_do=lambda k, n, r: self.q.put(("tien_do", (k, n, r["trang_thai"]))),
+                                   dung=self.dung)
+            except Exception as e:
+                self.q.put(("log", f"LỖI: {type(e).__name__}: {e}"))
+            self.q.put(("xong", None))
+
+        self.luong = threading.Thread(target=chay, daemon=True)
+        self.luong.start()
+
+    def dung_lai(self):
+        self.dung.set()
+        self.nut_dung.configure(state="disabled")
+        self.lb_tien_do.configure(text="Đang dừng…")
+        self._ghi("Đang dừng — chờ các file đang xử lý dở xong rồi ghi báo cáo…")
+
+    def cat_chot(self):
+        vao, ra = self.v["vao"].get().strip(), self.v["ra"].get().strip()
+        bang = Path(ra) / "bao_cao.xlsx"
+        if not bang.exists():
+            bang = Path(ra) / "bao_cao.csv"
+        if not bang.exists():
+            messagebox.showinfo("Chưa có bảng", "Chưa có bao_cao.xlsx trong thư mục kết quả. Hãy chạy tách trước.")
+            return
+        self._dang_chay(True)
+
+        def chay():
+            try:
+                self.tvb.cat_theo_bang(vao, ra, bang, log=lambda s: self.q.put(("log", s)))
+            except PermissionError:
+                self.q.put(("log", "LỖI: không đọc được bảng — hãy đóng file Excel rồi bấm lại."))
+            except Exception as e:
+                self.q.put(("log", f"LỖI: {type(e).__name__}: {e}"))
+            self.q.put(("xong_chot", None))
+
+        threading.Thread(target=chay, daemon=True).start()
+
+    def _mo_ket_qua(self, ten):
+        ra = self.v["ra"].get().strip()
+        if not ra:
+            messagebox.showinfo("Chưa có", "Chưa chọn thư mục kết quả.")
+            return
+        mo(Path(ra) / ten if ten else Path(ra))
+
+    def _doc_hang_doi(self):
+        try:
+            while True:
+                loai, gt = self.q.get_nowait()
+                if loai == "log":
+                    self._ghi(gt)
+                elif loai == "dem":
+                    self.lb_dem.configure(text=gt)
+                elif loai == "tien_do":
+                    k, n, tt = gt
+                    self.tien_do.configure(maximum=n, value=k)
+                    self.lb_tien_do.configure(text=f"{k}/{n} file")
+                    self._dem_hien[tt] = self._dem_hien.get(tt, 0) + 1
+                    o, ten = self.lb_dem_tt[tt]
+                    o.configure(text=f"{ten}: {self._dem_hien[tt]}")
+                elif loai == "xong":
+                    self._dang_chay(False)
+                    self.lb_tien_do.configure(text="Xong" if not self.dung.is_set() else "Đã dừng")
+                    if (Path(self.v["ra"].get()) / "xem_lai.html").exists() and self._dem_hien and any(self._dem_hien.values()):
+                        if messagebox.askyesno("Xong", "Đã tách xong. Mở trang xem lại?"):
+                            self._mo_ket_qua("xem_lai.html")
+                elif loai in ("goi_xong", "goi_loi"):
+                    self.nut_tai_goi.configure(state="normal")
+                    if loai == "goi_loi":
+                        messagebox.showerror("Không tải được", f"Không tải được gói tiếng Việt:\n{gt}\n\n"
+                                             "Bấm 'Tải thủ công…' để tải bằng trình duyệt, rồi chép vie.traineddata vào:\n"
+                                             f"{self.tvb.thu_muc_goi_rieng()}")
+                    self.kiem_tra_ocr()
+                elif loai == "xong_chot":
+                    self._dang_chay(False)
+                    if messagebox.askyesno("Xong", "Đã cắt bản chốt. Mở thư mục chot?"):
+                        self._mo_ket_qua("chot")
+        except queue.Empty:
+            pass
+        self.after(100, self._doc_hang_doi)
+
+    # ------------------------------------------------------------------ cấu hình
+    def _luu_cau_hinh(self):
+        try:
+            F_CAU_HINH.write_text(json.dumps({k: v.get() for k, v in self.v.items()}, ensure_ascii=False, indent=1),
+                                  encoding="utf-8")
+        except OSError:
+            pass
+
+    def _nap_cau_hinh(self):
+        try:
+            d = json.loads(F_CAU_HINH.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        for k, gt in d.items():
+            if k in self.v:
+                try:
+                    self.v[k].set(gt)
+                except tk.TclError:
+                    pass
+        # Tesseract đi kèm bản đóng gói luôn được ưu tiên; đường dẫn đã lưu không còn tồn tại thì tìm lại
+        tim = self.tvb.tim_tesseract()
+        da_luu = self.v["tesseract"].get().strip()
+        if (tim and Path(tim).parent.parent == self.tvb.thu_muc_ung_dung()) or (da_luu and not os.path.exists(da_luu)):
+            self.v["tesseract"].set(tim or "")
+        if self.v["vao"].get():
+            self._dem_file()
+
+    def _dong(self):
+        if self.luong and self.luong.is_alive():
+            if not messagebox.askyesno("Đang chạy", "Đang tách dở. Thoát sẽ dừng giữa chừng. Vẫn thoát?"):
+                return
+            self.dung.set()
+        self._luu_cau_hinh()
+        self.destroy()
+
+
+def tu_kiem_tra(thu_muc: str) -> int:
+    """Chạy thử toàn bộ trên dữ liệu giả, không mở cửa sổ. Dùng để kiểm tra bản đóng gói (CI).
+    Ghi kết quả vào <thu_muc>/tu_kiem_tra.txt; trả về 0 nếu đạt."""
+    import tach_van_ban as tvb
+    import tao_du_lieu_thu
+    goc = Path(thu_muc)
+    nhat_ky = []
+    try:
+        tao_du_lieu_thu.tao_tat_ca(goc / "scan")
+        cfg = tvb.cfg_mac_dinh()
+        ok, tb = tvb.kiem_tra_ocr(cfg)
+        nhat_ky.append(f"OCR: {tb}")
+        if not ok:
+            raise RuntimeError(tb)
+        kq = tvb.chay_tach(goc / "scan", goc / "ket_qua", cfg, so_luong=2, log=nhat_ky.append)
+        tt = {r["duong_dan"][0]: r["trang_thai"] for r in kq}
+        mong_doi_dat = {"A", "B", "E", "H"}
+        loi = [r["duong_dan"] for r in kq if r["trang_thai"] == "LOI"]
+        thieu = sorted(k for k in mong_doi_dat if tt.get(k) != "DAT")
+        nhat_ky.append(f"Trạng thái: {tt}")
+        dat = len(kq) == 8 and not loi and not thieu
+        nhat_ky.append("KẾT QUẢ: ĐẠT" if dat else f"KẾT QUẢ: KHÔNG ĐẠT (lỗi: {loi}, không đạt như mong đợi: {thieu})")
+    except Exception:
+        import traceback
+        nhat_ky.append("KẾT QUẢ: LỖI\n" + traceback.format_exc())
+        dat = False
+    goc.mkdir(parents=True, exist_ok=True)
+    (goc / "tu_kiem_tra.txt").write_text("\n".join(nhat_ky), encoding="utf-8")
+    return 0 if dat else 1
+
+
+def main():
+    if "--tu-kiem-tra" in sys.argv:
+        i = sys.argv.index("--tu-kiem-tra")
+        sys.exit(tu_kiem_tra(sys.argv[i + 1] if i + 1 < len(sys.argv) else "tu_kiem_tra"))
+    if sys.platform == "win32":
+        try:  # chữ nét trên màn hình độ phân giải cao
+            import ctypes
+            ctypes.windll.shcore.SetProcessDpiAwareness(1)
+        except Exception:
+            pass
+    try:
+        import tach_van_ban as tvb
+    except ImportError as e:
+        r = tk.Tk()
+        r.withdraw()
+        messagebox.showerror("Thiếu thư viện",
+                             f"Chưa cài đủ thư viện Python ({e.name}).\n\n"
+                             "Windows: bấm đúp cai_dat.bat.\nmacOS/Linux: pip install -r requirements.txt")
+        return
+    UngDung(tvb).mainloop()
+
+
+if __name__ == "__main__":
+    multiprocessing.freeze_support()
+    main()

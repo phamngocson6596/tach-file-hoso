@@ -1,0 +1,51 @@
+# Tự đóng gói bản Windows (giải nén là chạy, kèm sẵn Python + Tesseract + gói tiếng Việt)
+# - Mỗi khi bấm "Publish release" trên GitHub: đóng gói, tự kiểm tra, rồi đính file .zip vào release đó.
+# - Hoặc chạy tay: tab Actions -> "Đóng gói bản Windows" -> Run workflow (file .zip nằm ở mục Artifacts).
+name: Đóng gói bản Windows
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Cài thư viện Python và PyInstaller
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt pyinstaller
+
+      - name: Cài Tesseract OCR
+        run: choco install tesseract --no-progress -y
+
+      - name: Tải gói tiếng Việt cho Tesseract
+        run: curl.exe -fsSL -o vie.traineddata https://github.com/tesseract-ocr/tessdata/raw/main/vie.traineddata
+
+      - name: Đóng gói và tự kiểm tra
+        shell: pwsh
+        run: ./packaging/build_windows.ps1 -VieModel vie.traineddata
+
+      - name: Lưu bản đóng gói
+        uses: actions/upload-artifact@v4
+        with:
+          name: TachVanBan-windows-x64
+          path: dist/TachVanBan-*.zip
+
+      - name: Đính kèm vào release
+        if: github.event_name == 'release'
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" (Get-ChildItem dist/TachVanBan-*.zip).FullName --clobber

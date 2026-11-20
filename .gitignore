@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Đóng gói
+build/
+dist/
+*.spec
+vie.traineddata
+
+# Kết quả chạy thử / dữ liệu (KHÔNG đưa hồ sơ thật lên GitHub)
+du_lieu_thu/
+ket_qua*/
+*_ket_qua/
+chu_ocr/
+.cache/
+*.pdf
+!docs/*.pdf
