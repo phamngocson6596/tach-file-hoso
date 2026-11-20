@@ -988,6 +988,12 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
             ten_ra.append(moi.rsplit("/", 1)[-1])
         if cfg["xuat_ho_so"]:
             con_lai = [i for i in range(n) if i not in trong_vb]
+            if cfg.get("bo_trang_trang_ho_so", True):
+                trang_trang = [i for i in con_lai if trang[i]["nhan"] == "TT" and "trung" not in trang[i]]
+                con_lai = [i for i in con_lai if i not in trang_trang]
+                if trang_trang:
+                    thong_tin.append(f"bỏ {len(trang_trang)} trang trắng khỏi hồ sơ")
+                    kq["thong_tin"] = " · ".join(thong_tin)
             if con_lai:
                 ghi_pdf(src, con_lai, ra / "ho_so" / rel)
                 x = info[0] if info else dict(so_tho=[], so_cc=set(), ngay=None, loai="")
@@ -1139,6 +1145,27 @@ File DAT không có ảnh thu nhỏ trừ khi chạy với <code>--xem-tat-ca</c
 # 6. CHẾ ĐỘ CẮT LẠI THEO CSV ĐÃ SỬA
 # =====================================================================
 
+def trang_trang_cua_file(src, p: Path, ra: Path, cfg: dict) -> set[int]:
+    """Các trang trắng của 1 file khi cắt bản chốt (không OCR lại): ưu tiên kết quả đã lưu trong .cache,
+    không có thì đo lượng mực trên trang."""
+    nguong = cfg.get("nguong_trang", 0.002)
+    try:
+        f_cache = ra / ".cache" / f"{khoa_cache(p, dict(cfg_mac_dinh(), **cfg))}.json"
+        doc = json.loads(f_cache.read_text(encoding="utf-8"))
+        if len(doc) == src.page_count:
+            return {i for i, d in enumerate(doc)
+                    if phan_tich_trang(d["text"], d["muc"], nguong)["nhan"] == "TT"}
+    except (OSError, ValueError, KeyError):
+        pass
+    kq = set()
+    for i in range(src.page_count):
+        pix = src[i].get_pixmap(dpi=cfg.get("dpi", 200), colorspace=pymupdf.csGRAY, alpha=False)
+        img = Image.frombuffer("L", (pix.width, pix.height), pix.samples, "raw", "L", pix.stride, 1)
+        if muc_muc(img) < nguong:
+            kq.add(i)
+    return kq
+
+
 def _doc_ngay_bang(s: str):
     s = (s or "").strip()
     m = re.fullmatch(r"(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})", s)
@@ -1158,7 +1185,7 @@ def cat_theo_bang(vao, ra, f_bang, log=print, cfg: dict | None = None) -> int:
     if dich_goc.exists() and any(dich_goc.rglob("*.pdf")):
         log(f"Lưu ý: {dich_goc} đã có file từ lần trước; file trùng tên sẽ bị ghi đè, file khác giữ nguyên.")
     bo_ten, bo_ten_hs = BoTenDuyNhat(), BoTenDuyNhat()
-    n_ok = n_bo = n_ten_goc = 0
+    n_ok = n_bo = n_ten_goc = n_trang_trang = 0
     for r in sorted(doc_bang(f_bang), key=lambda r: (r.get("duong_dan") or "")):
         rel = (r.get("duong_dan") or "").strip()
         s = (r.get("trang_van_ban") or "").strip()
@@ -1182,6 +1209,10 @@ def cat_theo_bang(vao, ra, f_bang, log=print, cfg: dict | None = None) -> int:
             if cfg.get("xuat_ho_so"):
                 trong = {x for d in ds for x in d}
                 con_lai = [i for i in range(src.page_count) if i not in trong]
+                if cfg.get("bo_trang_trang_ho_so", True) and con_lai:
+                    trang_trang = trang_trang_cua_file(src, src_p, ra, cfg)
+                    n_trang_trang += sum(1 for i in con_lai if i in trang_trang)
+                    con_lai = [i for i in con_lai if i not in trang_trang]
                 if con_lai:
                     gt = gia_tri_ten(rel, lay(so_l, 0), _doc_ngay_bang(lay(ngay_l, 0)), lay(loai_l, 0), 1)
                     moi, _ = duong_dan_theo_mau(rel, mau_hs, gt, 1)
@@ -1192,6 +1223,8 @@ def cat_theo_bang(vao, ra, f_bang, log=print, cfg: dict | None = None) -> int:
             log(f"  LỖI {rel}: {e}")
     log(f"Đã cắt {n_ok} file vào {dich_goc}" + (f" (hồ sơ: {dich_hs})" if cfg.get("xuat_ho_so") else "")
         + f" · bỏ qua {n_bo} dòng trống/BO.")
+    if n_trang_trang:
+        log(f"  Đã bỏ {n_trang_trang} trang trắng khỏi phần hồ sơ.")
     if n_ten_goc:
         log(f"  {n_ten_goc} văn bản thiếu số/ngày/loại để đặt tên theo mẫu nên giữ tên gốc "
             "(điền vào cột so_cong_chung / ngay_cong_chung / loai_van_ban rồi cắt lại).")
@@ -1245,6 +1278,7 @@ def cfg_mac_dinh() -> dict:
         mau_ten_vb="{ten}",        # mẫu tên file văn bản, vd "{nam}_{so_cc}_{loai}"
         mau_ten_hs="{ten}",        # mẫu tên file hồ sơ còn lại (thư mục ho_so), vd "{ten}_HS"
         xem_tat_ca=False, xuat_ho_so=False, luu_chu=False, dpi_anh=40, debug=False,
+        bo_trang_trang_ho_so=True,  # bỏ trang trắng khỏi phần hồ sơ (văn bản thì mặc định đã bỏ)
     )
 
 
@@ -1493,6 +1527,7 @@ def main():
     g.add_argument("--ten-van-ban", default=md["mau_ten_vb"],
                    help="mẫu tên file văn bản; trường: " + ", ".join("{%s} %s" % kv for kv in TRUONG_TEN.items()))
     g.add_argument("--ten-ho-so", default=md["mau_ten_hs"], help="mẫu tên file hồ sơ còn lại, vd {ten}_HS")
+    g.add_argument("--giu-trang-trang-ho-so", action="store_true", help="giữ trang trắng trong phần hồ sơ (mặc định bỏ)")
     g.add_argument("--luu-chu", action="store_true", help="lưu chữ OCR từng file vào chu_ocr/ (để dò lỗi)")
     g.add_argument("--theo-bang", "--theo-csv", dest="theo_bang",
                    help="bỏ qua OCR, cắt PDF theo cột trang_van_ban trong bao_cao.xlsx/.csv đã sửa")
@@ -1505,9 +1540,11 @@ def main():
             sys.exit(f"Mẫu tên '{mau}' không hợp lệ: {loi}")
     if a.theo_bang:
         cat_theo_bang(a.vao, a.ra, a.theo_bang,
-                      cfg=dict(mau_ten_vb=a.ten_van_ban, mau_ten_hs=a.ten_ho_so, xuat_ho_so=a.xuat_ho_so))
+                      cfg=dict(mau_ten_vb=a.ten_van_ban, mau_ten_hs=a.ten_ho_so, xuat_ho_so=a.xuat_ho_so,
+                               bo_trang_trang_ho_so=not a.giu_trang_trang_ho_so, dpi=a.dpi, lang=a.lang,
+                               engine=a.engine, luon_ocr=a.luon_ocr, nguong_trang=a.nguong_trang))
         return
-    cfg = dict(md, mau_ten_vb=a.ten_van_ban, mau_ten_hs=a.ten_ho_so, mot_van_ban=not a.nhieu_van_ban, vi_tri=a.vi_tri, so_cc_trong_ten=a.so_cc_trong_ten,
+    cfg = dict(md, mau_ten_vb=a.ten_van_ban, mau_ten_hs=a.ten_ho_so, bo_trang_trang_ho_so=not a.giu_trang_trang_ho_so, mot_van_ban=not a.nhieu_van_ban, vi_tri=a.vi_tri, so_cc_trong_ten=a.so_cc_trong_ten,
                ten_to_chuc=a.ten_to_chuc, uu_tien_ngay_moi=not a.khong_uu_tien_ngay,
                can_quoc_hieu=not a.khong_can_quoc_hieu, giu_trang_trang=a.giu_trang_trang,
                engine=a.engine, dpi=a.dpi, lang=a.lang, tesseract=a.tesseract, luon_ocr=a.luon_ocr,

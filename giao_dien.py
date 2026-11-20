@@ -126,6 +126,7 @@ class UngDung(tk.Tk):
             kiem_tra_cap_nhat=tk.BooleanVar(value=True),
             mau_ten_vb=tk.StringVar(value=md["mau_ten_vb"]),
             mau_ten_hs=tk.StringVar(value=md["mau_ten_hs"]),
+            bo_trang_trang_ho_so=tk.BooleanVar(value=md["bo_trang_trang_ho_so"]),
         )
 
     def _dung_giao_dien(self):
@@ -314,20 +315,24 @@ class UngDung(tk.Tk):
         w = ttk.Combobox(r, textvariable=self.v["mau_ten_hs"], values=MAU_HS, width=18)
         w.pack(side="left", padx=4, fill="x", expand=True)
         GoiY(w, goi_y_ten + "\n\nFile hồ sơ nằm trong thư mục ho_so (khi tách) và chot_ho_so (khi cắt bản chốt).")
+        w = ttk.Checkbutton(f, text="Bỏ trang trắng khỏi phần hồ sơ", variable=self.v["bo_trang_trang_ho_so"])
+        w.grid(row=3, column=0, columnspan=3, sticky="w", padx=(22, 0))
+        GoiY(w, "Áp dụng cho phần hồ sơ khi tách và khi cắt bản chốt. Văn bản công chứng thì mặc định đã bỏ trang "
+                "trắng (muốn giữ thì tick 'Giữ trang trắng nằm giữa văn bản' ở mục 2).")
         for k in ("mau_ten_vb", "mau_ten_hs"):
             self.v[k].trace_add("write", lambda *_: self._cap_nhat_vi_du())
         ttk.Checkbutton(f, text="Ảnh thu nhỏ cho cả file đạt (để soát kỹ khi chạy thử)", variable=self.v["xem_tat_ca"]) \
-            .grid(row=3, column=0, columnspan=3, sticky="w")
+            .grid(row=4, column=0, columnspan=3, sticky="w")
         w = ttk.Checkbutton(f, text="Lưu chữ OCR để dò lỗi (thư mục chu_ocr — có dữ liệu cá nhân)",
                             variable=self.v["luu_chu"])
-        w.grid(row=4, column=0, columnspan=3, sticky="w")
+        w.grid(row=5, column=0, columnspan=3, sticky="w")
         r = ttk.Frame(f)
-        r.grid(row=5, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        r.grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
         ttk.Label(r, text="Chỉ chạy thử").pack(side="left")
         ttk.Spinbox(r, from_=0, to=100000, textvariable=self.v["gioi_han"], width=7).pack(side="left", padx=4)
         ttk.Label(r, text="file đầu tiên (0 = tất cả)", style="Goiy.TLabel").pack(side="left")
         w = ttk.Checkbutton(f, text="Tự kiểm tra bản mới khi mở phần mềm", variable=self.v["kiem_tra_cap_nhat"])
-        w.grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        w.grid(row=7, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self._cap_nhat_vi_du()
         GoiY(w, "Khi mở, phần mềm hỏi GitHub số phiên bản mới nhất để báo nếu có bản mới. "
                 "Chỉ gửi đúng yêu cầu này, không gửi bất kỳ dữ liệu hồ sơ nào. Bỏ tick nếu muốn phần mềm "
@@ -443,6 +448,7 @@ class UngDung(tk.Tk):
             giu_trang_trang=v["giu_trang_trang"].get(), engine=ENGINE[v["engine"].get()],
             dpi=int(v["dpi"].get() or 200), tesseract=v["tesseract"].get().strip() or None,
             luon_ocr=v["luon_ocr"].get(), xuat_ho_so=v["xuat_ho_so"].get(), xem_tat_ca=v["xem_tat_ca"].get(),
+            bo_trang_trang_ho_so=v["bo_trang_trang_ho_so"].get(),
             luu_chu=v["luu_chu"].get(),
             mau_ten_vb=v["mau_ten_vb"].get().strip() or "{ten}", mau_ten_hs=v["mau_ten_hs"].get().strip() or "{ten}",
         )

@@ -172,6 +172,7 @@ Ví dụ: mẫu `{nam}_{so_cc}_{loai}` cho ra `2023_027529_GIAY_UY_QUYEN.pdf`.
 - File có nhiều văn bản mà mẫu không có `{stt}` thì tự thêm `__vb1`, `__vb2`.
 - Văn bản nào **thiếu dữ liệu** cho mẫu (ví dụ không đọc được số công chứng) thì **giữ tên gốc**. Bảng Excel có các cột `so_cong_chung`, `ngay_cong_chung`, `loai_van_ban` và `file_van_ban`. Bạn điền hoặc sửa các cột này, rồi bấm **Cắt bản chốt**: tên file sẽ được đặt lại theo đúng giá trị đã sửa.
 - Nếu chọn **Xuất thêm phần hồ sơ còn lại**, khi cắt bản chốt phần hồ sơ được ghi vào thư mục **`chot_ho_so`**, cạnh thư mục `chot`.
+- Ô **Bỏ trang trắng khỏi phần hồ sơ** được bật sẵn. Ô này áp dụng cả khi tách lẫn khi cắt bản chốt; trang trắng được nhận ra từ kết quả đọc chữ đã lưu, nên không phải đọc lại. Văn bản công chứng thì mặc định đã bỏ trang trắng.
 
 ### Kiểm tra thiếu, thừa, trùng trang
 
