@@ -24,6 +24,8 @@ DefaultGroupName={#MyAppName}
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 PrivilegesRequiredOverridesAllowed=commandline dialog
+; Python 3.13 chỉ chạy trên Windows 10 trở lên: chặn ngay từ bộ cài thay vì báo lỗi khó hiểu khi mở
+MinVersion=10.0
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir=..\dist

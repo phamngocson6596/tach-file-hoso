@@ -16,6 +16,8 @@ Công cụ đọc từng trang, nhận ra trang nào thuộc văn bản (từ ti
 
 ## Tải về và sử dụng (Windows)
 
+**Yêu cầu: Windows 10 hoặc Windows 11, bản 64-bit.** Windows 7 và 8.1 không chạy được, vì Python 3.13 mà phần mềm dùng không hỗ trợ hai hệ điều hành này. Trên Windows 7, bản zip sẽ báo lỗi *"Failed to load Python DLL … python313.dll"*.
+
 ### ⬇️ [Tải bộ cài (TachVanBan-CaiDat.exe)](https://github.com/phamngocson6596/tach-file-hoso/releases/latest/download/TachVanBan-CaiDat.exe)
 
 Link trên luôn trỏ tới bản mới nhất. Các bản trước xem ở trang **[Releases](../../releases)**. Bộ cài đã kèm sẵn Python, Tesseract và gói tiếng Việt, **không cần cài gì thêm**.

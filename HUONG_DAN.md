@@ -13,6 +13,8 @@ Công cụ dành cho các tổ chức hành nghề công chứng có bản scan 
 
 ### Cách 1 — Bản đóng gói cho Windows (khuyên dùng)
 
+**Yêu cầu: Windows 10 hoặc 11, bản 64-bit.** Windows 7 và 8.1 không chạy được.
+
 Vào trang **Releases** của dự án trên GitHub và tải một trong hai file. Cả hai đều đã kèm sẵn Python, Tesseract và gói tiếng Việt.
 
 - **`TachVanBan-CaiDat.exe`** (khuyên dùng, file nhỏ nhất): chạy file, bấm Next. Mặc định cài cho riêng người dùng hiện tại nên **không cần quyền quản trị**. Sau khi cài có biểu tượng ở menu Start, gỡ được trong *Settings → Apps*.
