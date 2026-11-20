@@ -307,6 +307,12 @@ class UngDung(tk.Tk):
             o = tk.Label(r, text=f"{ten}: 0", fg="white", bg=mau, padx=8, pady=2, font=("Segoe UI", 9, "bold"))
             o.pack(side="left", padx=(0, 6))
             self.lb_dem_tt[k] = (o, ten)
+        self.lb_thieu = tk.Label(r, text="Nghi thiếu trang: 0", fg="#b91c1c", bg="#fee2e2", padx=8, pady=2,
+                                 font=("Segoe UI", 9, "bold"))
+        self.lb_thieu.pack(side="left", padx=(6, 0))
+        GoiY(self.lb_thieu, "Số file có văn bản nghi thiếu, thừa hoặc trùng trang (so với số trang ghi trong lời "
+                            "chứng, số trang in, số Điều). Xem chi tiết ở cột nghi_thieu_trang trong bảng Excel, "
+                            "hoặc bấm lọc 'Nghi thiếu/thừa trang' trong trang xem lại.")
 
         self.nhat_ky = ScrolledText(cha, height=8, font=("Consolas", 9), wrap="none", state="disabled")
         self.nhat_ky.grid(row=4, column=0, sticky="nsew")
@@ -437,13 +443,16 @@ class UngDung(tk.Tk):
         for o, ten in self.lb_dem_tt.values():
             o.configure(text=f"{ten}: 0")
         self._dem_hien = {k: 0 for k in NHAN_TT}
+        self._dem_thieu = 0
+        self.lb_thieu.configure(text="Nghi thiếu trang: 0")
         self._dang_chay(True)
 
         def chay():
             try:
                 self.tvb.chay_tach(vao, ra, cfg, so_luong=so_luong, gioi_han=gioi_han,
                                    log=lambda s: self.q.put(("log", s)),
-                                   tien_do=lambda k, n, r: self.q.put(("tien_do", (k, n, r["trang_thai"]))),
+                                   tien_do=lambda k, n, r: self.q.put(("tien_do", (k, n, r["trang_thai"],
+                                                                                    bool(r.get("nghi_thieu_trang"))))),
                                    dung=self.dung)
             except Exception as e:
                 self.q.put(("log", f"LỖI: {type(e).__name__}: {e}"))
@@ -495,7 +504,10 @@ class UngDung(tk.Tk):
                 elif loai == "dem":
                     self.lb_dem.configure(text=gt)
                 elif loai == "tien_do":
-                    k, n, tt = gt
+                    k, n, tt, thieu = gt
+                    if thieu:
+                        self._dem_thieu += 1
+                        self.lb_thieu.configure(text=f"Nghi thiếu trang: {self._dem_thieu}")
                     self.tien_do.configure(maximum=n, value=k)
                     self.lb_tien_do.configure(text=f"{k}/{n} file")
                     self._dem_hien[tt] = self._dem_hien.get(tt, 0) + 1
@@ -574,11 +586,17 @@ def tu_kiem_tra(thu_muc: str) -> int:
             raise RuntimeError(tb)
         kq = tvb.chay_tach(goc / "scan", goc / "ket_qua", cfg, so_luong=2, log=nhat_ky.append)
         tt = {r["duong_dan"][0]: r["trang_thai"] for r in kq}
-        mong_doi_dat = {"A", "B", "E", "H"}
+        nghi_trang = {r["duong_dan"][0] for r in kq if r.get("nghi_thieu_trang")}
+        mong_doi_dat = {"A", "B", "E", "H", "M"}
+        mong_doi_nghi_trang = {"J", "K", "L"}
         loi = [r["duong_dan"] for r in kq if r["trang_thai"] == "LOI"]
         thieu = sorted(k for k in mong_doi_dat if tt.get(k) != "DAT")
+        sai_trang = sorted(mong_doi_nghi_trang ^ nghi_trang)
         nhat_ky.append(f"Trạng thái: {tt}")
-        dat = len(kq) == 8 and not loi and not thieu
+        nhat_ky.append(f"Nghi thiếu/thừa trang: {sorted(nghi_trang)}")
+        dat = len(kq) == 12 and not loi and not thieu and not sai_trang
+        if sai_trang:
+            thieu.append(f"kiểm tra số trang sai ở {sai_trang}")
         nhat_ky.append("KẾT QUẢ: ĐẠT" if dat else f"KẾT QUẢ: KHÔNG ĐẠT (lỗi: {loi}, không đạt như mong đợi: {thieu})")
     except Exception:
         import traceback

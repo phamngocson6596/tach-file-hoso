@@ -142,6 +142,24 @@ KetQua/
 - **Không thấy:** không nhận ra văn bản công chứng nào, ví dụ file chỉ có hồ sơ hoặc trang bị xoay ngang.
 - **Lỗi:** file hỏng hoặc có mật khẩu.
 
+### Kiểm tra thiếu, thừa, trùng trang
+
+Với mỗi văn bản đã tách, công cụ tự kiểm tra số trang. Kết quả ghi ở cột **`nghi_thieu_trang`** trong bảng Excel. File có nghi vấn được đưa vào nhóm **cần kiểm tra**; trong trang xem lại có nút lọc **"Nghi thiếu/thừa trang"**.
+
+| Cách kiểm tra | Ví dụ cảnh báo | Độ tin cậy |
+|---|---|---|
+| So với câu *"…mỗi bản chính gồm 02 tờ, 05 trang"* trong lời chứng | lời chứng ghi 5 trang nhưng chỉ tách được 4 trang (thiếu 1) | Cao. Khi khớp, bảng ghi *"đủ 5/5 trang theo lời chứng"* |
+| Số trang in trên trang ("1", "- 2 -", "Trang 3/5") | số trang in nhảy từ 2 (tr.4) sang 4 (tr.5): thiếu trang 3 | Thấp. OCR hay bỏ sót con số nhỏ đứng riêng ở lề, nên chỉ đọc được ở một số trang |
+| Số Điều nhảy cóc giữa hai trang liền nhau | Điều nhảy từ 2 (tr.1) sang 7 (tr.2) | Trung bình. Chỉ ra **vị trí** trang bị mất, nhưng có thể báo nhầm khi OCR đọc sót tiêu đề Điều |
+| Hai trang liền nhau gần như giống hệt | tr.2 và tr.3 gần như giống hệt (scan trùng?) | Cao |
+
+Khi lời chứng ghi số trang **khớp** với số trang tách được, công cụ bỏ qua các dấu hiệu yếu (số trang in, số Điều), vì khi đó văn bản không thể thiếu trang.
+
+Không phát hiện được khi cả ba điều sau cùng xảy ra:
+- lời chứng không ghi số trang;
+- trang không in số;
+- trang bị mất không làm nhảy số Điều.
+
 Cách viết cột `trang_van_ban` khi sửa tay:
 
 | Viết | Ý nghĩa |

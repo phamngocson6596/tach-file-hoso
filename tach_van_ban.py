@@ -36,7 +36,7 @@ except ImportError:  # PyMuPDF bản cũ
     import fitz as pymupdf
 from PIL import Image
 
-PHIEN_BAN = "0.3.1"
+PHIEN_BAN = "0.3.2"
 
 # =====================================================================
 # 1. CHUẨN HOÁ CHỮ & TỪ KHOÁ
@@ -90,7 +90,7 @@ DAU_HIEU_HO_SO = ds_mau([
 
 M_LOI_CHUNG = mau("LOI CHUNG")
 M_QUOC_HIEU = [mau("CONG HOA XA HOI CHU NGHIA"), mau("DOC LAP TU DO HANH PHUC")]
-M_SO_CONG_CHUNG = [mau("SO CONG CHUNG"), mau("QUYEN SO"), re.compile(r"\bTP ?/ ?CC\b")]
+M_SO_CONG_CHUNG = [mau("SO CONG CHUNG"), re.compile(r"\bQUYEN S[O0] \d"), re.compile(r"\bTP ?/ ?CC\b")]
 M_CCV = mau("CONG CHUNG VIEN")
 M_DIEU = re.compile(r"\bD[I1L]EU ?\d{1,2}\b")
 M_KY = [
@@ -271,9 +271,9 @@ def chia_van_ban(trang: list[dict], can_quoc_hieu: bool = True) -> tuple[list[di
 
 # ---------- Chọn VĂN BẢN CHÍNH khi 1 file có nhiều văn bản (vd hồ sơ lưu kèm bản sao HĐ cũ) ----------
 M_SO_CC_SO = [
-    re.compile(r"\bS[O0] C[O0]NG CHUNG(?: S[O0])? (\d{1,6})\b"),
-    re.compile(r"\bC[O0]NG CHUNG S[O0] (\d{1,6})\b"),
-    re.compile(r"\bS[O0] (\d{1,6}) QUYEN S[O0]\b"),
+    re.compile(r"\bS[O0] C[O0]NG CHUNG(?: S[O0])? ((?:\d ?){3,8})"),
+    re.compile(r"\bC[O0]NG CHUNG S[O0] ((?:\d ?){3,8})"),
+    re.compile(r"\bS[O0] ((?:\d ?){3,8}) QUYEN S[O0]\b"),
 ]
 M_QUYEN_NAM = re.compile(r"\bQUYEN S[O0] \d{1,4} ((?:19|20)\d{2})\b")
 M_NGAY_CHU = re.compile(r"\bNGAY (\d{1,2}) THANG (\d{1,2}) NAM ((?:19|20)\d{2})\b")
@@ -290,9 +290,34 @@ def loi_ten_to_chuc(ten: str) -> str:
     return b
 
 
-def so_trong_ten(rel: str) -> set[int]:
+def _chuan_so(x: str) -> str:
+    return x.replace(" ", "").lstrip("0") or "0"
+
+
+def so_trong_ten(rel: str) -> set[str]:
     goc = rel.rsplit(".", 1)[0]
-    return {int(x) for x in re.findall(r"\d+", goc) if len(x) <= 6}
+    return {_chuan_so(x) for x in re.findall(r"\d+", goc) if 3 <= len(x) <= 8}
+
+
+def _gan_giong(a: str, b: str) -> bool:
+    """Bằng nhau, hoặc (số từ 4 chữ số) lệch đúng 1 chữ số do OCR đọc sai/thiếu/thừa."""
+    if a == b:
+        return True
+    if min(len(a), len(b)) < 4 or abs(len(a) - len(b)) > 1:
+        return False
+    if len(a) == len(b):
+        return sum(x != y for x, y in zip(a, b)) == 1
+    dai, ngan = (a, b) if len(a) > len(b) else (b, a)
+    return any(dai[:k] + dai[k + 1:] == ngan for k in range(len(dai)))
+
+
+def khop_so(so_cc: set[str], so_ten: set[str]):
+    """Số công chứng đọc được có khớp số trong tên file không. Trả về số khớp hoặc None."""
+    for a in sorted(so_cc):
+        for b in sorted(so_ten):
+            if _gan_giong(a, b):
+                return b
+    return None
 
 
 def thong_tin_doan(d: dict, trang: list[dict], texts: list[str]) -> dict:
@@ -301,7 +326,7 @@ def thong_tin_doan(d: dict, trang: list[dict], texts: list[str]) -> dict:
     t = " ".join(bo_dau(texts[i]) for i in lc)
     so = set()
     for m in M_SO_CC_SO:
-        so.update(int(x) for x in m.findall(t))
+        so.update(_chuan_so(x) for x in m.findall(t) if len(x.replace(" ", "")) >= 3)
     ngay = None
     m = M_NGAY_CHU.search(t) or M_NGAY_SO.search(t)
     if m:
@@ -318,7 +343,7 @@ def thong_tin_doan(d: dict, trang: list[dict], texts: list[str]) -> dict:
 def mo_ta_doan(x: dict) -> str:
     s = []
     if x["so_cc"]:
-        s.append("số CC " + "/".join(map(str, sorted(x["so_cc"]))))
+        s.append("số CC " + "/".join(sorted(x["so_cc"])))
     if x["ngay"]:
         y, m, d = x["ngay"]
         s.append(f"{d:02d}/{m:02d}/{y}" if m else f"năm {y}")
@@ -359,8 +384,9 @@ def cham_diem_doan(doan: list[dict], info: list[dict], trang: list[dict], rel: s
     for k, x in enumerate(info):
         s, ly = 0, []
         if so_ten and x["so_cc"]:
-            if x["so_cc"] & so_ten:
-                s += 6; ly.append(f"số CC {min(x['so_cc'] & so_ten)} khớp tên file")
+            khop = khop_so(x["so_cc"], so_ten)
+            if khop:
+                s += 6; ly.append(f"số CC {khop} khớp tên file")
             else:
                 s -= 6; ly.append(f"số CC {min(x['so_cc'])} không có trong tên file")
         if m_tc:
@@ -432,19 +458,40 @@ def doc_khoang(s: str, so_trang: int) -> list[list[int]]:
 _SCREEN_AI = None
 
 
-def ocr_anh(img: Image.Image, cfg: dict) -> str:
+def ocr_anh(img: Image.Image, cfg: dict):
+    """Trả về (chữ, danh sách từ kèm vị trí [chữ, x0, y0, x1, y1, mã dòng] theo tỉ lệ 0..1 hoặc None)."""
     if cfg["engine"] == "screenai":
         global _SCREEN_AI
         if _SCREEN_AI is None:
             from locro import ScreenAI  # pip install từ github.com/sergiocorreia/clv-locro
             _SCREEN_AI = ScreenAI()
-        return _SCREEN_AI.ocr_pil_image(img.convert("RGB")).text
+        return _SCREEN_AI.ocr_pil_image(img.convert("RGB")).text, None
     import pytesseract
     if cfg.get("tesseract"):
         pytesseract.pytesseract.tesseract_cmd = cfg["tesseract"]
     if cfg.get("tessdata"):
         os.environ["TESSDATA_PREFIX"] = cfg["tessdata"]
-    return pytesseract.image_to_string(img, lang=cfg["lang"], config="--oem 1 --psm 3")
+    d = pytesseract.image_to_data(img, lang=cfg["lang"], config="--oem 1 --psm 3",
+                                  output_type=pytesseract.Output.DICT)
+    w, h = img.size
+    dong, tu, truoc, khoi_truoc = [], [], None, None
+    cac_dong = []
+    for k, chu in enumerate(d["text"]):
+        if not chu or not chu.strip():
+            continue
+        ma = (d["block_num"][k], d["par_num"][k], d["line_num"][k])
+        if ma != truoc:
+            if dong:
+                cac_dong.append(" ".join(dong))
+            if khoi_truoc is not None and ma[0] != khoi_truoc:
+                cac_dong.append("")
+            dong, truoc, khoi_truoc = [], ma, ma[0]
+        dong.append(chu)
+        x, y, ww, hh = d["left"][k], d["top"][k], d["width"][k], d["height"][k]
+        tu.append([chu, x / w, y / h, (x + ww) / w, (y + hh) / h, "%d.%d.%d" % ma])
+    if dong:
+        cac_dong.append(" ".join(dong))
+    return "\n".join(cac_dong), tu
 
 
 def muc_muc(img: Image.Image) -> float:
@@ -462,15 +509,159 @@ def doc_trang(page, cfg) -> dict:
     img = Image.frombuffer("L", (pix.width, pix.height), pix.samples, "raw", "L", pix.stride, 1)
     muc = muc_muc(img)
     if sum(c.isalpha() for c in lop_chu) >= 50:
-        return dict(text=lop_chu, muc=muc, nguon="lop_chu")
+        r = page.rect
+        tu = [[w[4], w[0] / r.width, w[1] / r.height, w[2] / r.width, w[3] / r.height, "%d.%d" % (w[5], w[6])]
+              for w in page.get_text("words")]
+        return dict(text=lop_chu, muc=muc, nguon="lop_chu", so_in=tim_so_trang_in(tu))
     if muc < MUC_BO_QUA_OCR:  # gần như không có điểm mực nào -> khỏi OCR cho nhanh
-        return dict(text="", muc=muc, nguon="trang")
-    return dict(text=ocr_anh(img, cfg), muc=muc, nguon=cfg["engine"])
+        return dict(text="", muc=muc, nguon="trang", so_in=None)
+    text, tu = ocr_anh(img, cfg)
+    return dict(text=text, muc=muc, nguon=cfg["engine"], so_in=tim_so_trang_in(tu) if tu else None)
+
+
+# ---------- Số trang in trên trang ("1", "- 2 -", "Trang 3/5") ----------
+_GIONG_SO = str.maketrans({"l": "1", "I": "1", "|": "1", "i": "1", "O": "0", "o": "0"})
+
+
+def tim_so_trang_in(tu) -> list | None:
+    """Tìm số trang in ở lề phải hoặc giữa, phần dưới (hoặc mép trên) của trang. Trả về [số, tổng hoặc None]."""
+    if not tu:
+        return None
+    theo_dong = {}
+    for t in tu:
+        theo_dong.setdefault(t[5], []).append(t)
+    ung_vien = []
+    for chu, x0, y0, x1, y1, ma in tu:
+        s = chu.strip().strip("-–—.,:;()[]{}'\"_~").translate(_GIONG_SO)
+        m = re.fullmatch(r"(\d{1,3})(?:/(\d{1,3}))?", s)
+        if not m:
+            continue
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        if not (cy > 0.55 or cy < 0.08) or not (cx > 0.80 or 0.38 < cx < 0.62):
+            continue
+        cung = [t for t in theo_dong[ma] if t[1] != x0 and any(c.isalnum() for c in t[0])]
+        if cung:
+            # cho phép "Trang 2", hoặc số đứng tách hẳn ở mép phải dòng (vd chân trang có email bên trái)
+            truoc = max((t for t in cung if t[3] <= x0 + 1e-6), key=lambda t: t[3], default=None)
+            la_chu_trang = len(cung) == 1 and bo_dau(cung[0][0]) == "TRANG"
+            tach_xa = cx > 0.85 and (truoc is None or x0 - truoc[3] > 0.12) and not any(t[1] > x1 for t in cung)
+            if not (la_chu_trang or tach_xa):
+                continue
+        so = int(m.group(1))
+        tong = int(m.group(2)) if m.group(2) else None
+        if 1 <= so <= 300 and (tong is None or so <= tong):
+            ung_vien.append((cy, so, tong))
+    if not ung_vien:
+        return None
+    _, so, tong = max(ung_vien)  # lấy số nằm thấp nhất trên trang
+    return [so, tong]
+
+
+# ---------- Kiểm tra thiếu trang / trùng trang trong 1 văn bản ----------
+_SO_CHU = {"MOT": 1, "HAI": 2, "BA": 3, "BON": 4, "TU": 4, "NAM": 5, "SAU": 6, "BAY": 7, "TAM": 8, "CHIN": 9, "MUOI": 10}
+_SO_HOAC_CHU = r"([0-9O]{1,3}|" + "|".join(_SO_CHU) + r")(?: \(?[A-Z]+\)?){0,2}"
+M_TO_TRANG = re.compile(r"\bG[O0]M " + _SO_HOAC_CHU + r" T[O0] " + _SO_HOAC_CHU + r" TRANG\b")
+M_CHI_TRANG = re.compile(r"\bG[O0]M " + _SO_HOAC_CHU + r" TRANG\b")
+M_CHI_TO = re.compile(r"\bG[O0]M " + _SO_HOAC_CHU + r" T[O0]\b")
+M_DIEU_DAU_DONG = re.compile(r"^D[I1L]EU ?(\d{1,2})\b")
+
+
+def _doc_so(x: str) -> int:
+    return _SO_CHU[x] if x in _SO_CHU else int(x.replace("O", "0"))
+
+
+def so_trang_theo_loi_chung(chu_lc: str):
+    """'…mỗi bản chính gồm 02 (hai) tờ, 02 (hai) trang' -> (số tờ, số trang); thiếu thì None."""
+    m = M_TO_TRANG.search(chu_lc)
+    if m:
+        return _doc_so(m.group(1)), _doc_so(m.group(2))
+    m = M_CHI_TRANG.search(chu_lc)
+    if m:
+        return None, _doc_so(m.group(1))
+    m = M_CHI_TO.search(chu_lc)
+    if m:
+        return _doc_so(m.group(1)), None
+    return None, None
+
+
+def kiem_tra_trang(d: dict, trang: list[dict], doc: list[dict]) -> tuple[list[str], list[str]]:
+    """Trả về (các dấu hiệu nghi thiếu/thừa/trùng trang, các xác nhận đủ trang)."""
+    import difflib
+    ds = [i for i in sorted(d["trang"]) if trang[i]["nhan"] != "TT"]
+    n = len(ds)
+    nghi, dat = [], []
+    if not ds:
+        return nghi, dat
+
+    # 1. Số trang ghi trong lời chứng — dấu hiệu chắc nhất
+    chu_lc = " ".join(bo_dau(doc[i]["text"]) for i in ds if trang[i]["nhan"] == "LC")
+    so_to, so_tr = so_trang_theo_loi_chung(chu_lc)
+    khop_loi_chung = False
+    if so_tr:
+        if n < so_tr:
+            nghi.append(f"lời chứng ghi {so_tr} trang nhưng chỉ tách được {n} trang (thiếu {so_tr - n})")
+        elif n > so_tr:
+            nghi.append(f"lời chứng ghi {so_tr} trang nhưng tách ra {n} trang (thừa {n - so_tr}: trang trùng hoặc lẫn hồ sơ?)")
+        else:
+            khop_loi_chung = True
+            dat.append(f"đủ {n}/{so_tr} trang theo lời chứng")
+    elif so_to:
+        if n < so_to:
+            nghi.append(f"lời chứng ghi {so_to} tờ nhưng chỉ tách được {n} trang")
+        elif n > 2 * so_to:
+            nghi.append(f"lời chứng ghi {so_to} tờ nhưng tách ra {n} trang")
+
+    # 2. Số trang in trên từng trang
+    biet = [(k, doc[i]["so_in"][0], doc[i]["so_in"][1]) for k, i in enumerate(ds) if doc[i].get("so_in")]
+    nhay = []
+    for (k1, a, _), (k2, b, _) in zip(biet, biet[1:]):
+        if b > a and b - a > k2 - k1:
+            mat = [str(x) for x in range(a + 1, b)][: (b - a) - (k2 - k1)] if k2 - k1 == 1 else []
+            nhay.append(f"số trang in nhảy từ {a} (tr.{ds[k1]+1}) sang {b} (tr.{ds[k2]+1})"
+                        + (f": thiếu trang {', '.join(mat)}" if mat else ""))
+    if biet and biet[0][1] > biet[0][0] + 1:
+        k, a, _ = biet[0]
+        nhay.append(f"trang đầu có số in là {a}: có thể thiếu trang {', '.join(map(str, range(k + 1, a)))} ở đầu văn bản")
+    tong = next((t for _, _, t in biet if t), None)
+    if tong and not so_tr:
+        if n < tong:
+            nhay.append(f"số trang in ghi tổng {tong} trang nhưng chỉ tách được {n}")
+        elif n == tong:
+            dat.append(f"đủ {n}/{tong} trang theo số trang in")
+
+    # 3. Số Điều nhảy cóc giữa hai trang liền nhau
+    def cac_dieu(i):
+        return [int(m.group(1)) for dong in doc[i]["text"].splitlines()
+                for m in [M_DIEU_DAU_DONG.match(bo_dau(dong))] if m]
+
+    truoc_max, truoc_k = None, None
+    for k, i in enumerate(ds):
+        so_dieu = cac_dieu(i)
+        if so_dieu and truoc_max is not None and min(so_dieu) > truoc_max + 1 and min(so_dieu) < 60:
+            nhay.append(f"Điều nhảy từ {truoc_max} (tr.{ds[truoc_k]+1}) sang {min(so_dieu)} (tr.{i+1})")
+        if so_dieu:
+            truoc_max, truoc_k = max(truoc_max or 0, max(so_dieu)), k
+
+    # Lời chứng ghi số trang khớp đúng thì không thể thiếu: bỏ qua các dấu hiệu yếu (có thể do OCR đọc sai số)
+    if not khop_loi_chung:
+        nghi += nhay
+
+    # 4. Trang scan trùng (hai trang liền nhau gần như giống hệt; khác số Điều hoặc số trang in thì không phải)
+    for k in range(1, n):
+        i1, i2 = ds[k - 1], ds[k]
+        if cac_dieu(i1) != cac_dieu(i2) or (doc[i1].get("so_in") and doc[i2].get("so_in")
+                                            and doc[i1]["so_in"] != doc[i2]["so_in"]):
+            continue
+        a, b = bo_dau(doc[i1]["text"]), bo_dau(doc[i2]["text"])
+        if min(len(a), len(b)) > 300 and difflib.SequenceMatcher(None, a, b, autojunk=False).quick_ratio() > 0.95 \
+                and difflib.SequenceMatcher(None, a, b, autojunk=False).ratio() > 0.93:
+            nghi.append(f"tr.{ds[k-1]+1} và tr.{ds[k]+1} gần như giống hệt (scan trùng?)")
+    return nghi, dat
 
 
 def khoa_cache(p: Path, cfg) -> str:
     st = p.stat()
-    s = f"{p.resolve()}|{st.st_size}|{st.st_mtime_ns}|{cfg['engine']}|{cfg['dpi']}|{cfg['lang']}|{cfg['luon_ocr']}"
+    s = f"v2|{p.resolve()}|{st.st_size}|{st.st_mtime_ns}|{cfg['engine']}|{cfg['dpi']}|{cfg['lang']}|{cfg['luon_ocr']}"
     return hashlib.sha1(s.encode()).hexdigest()
 
 
@@ -502,7 +693,8 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
     t0 = time.time()
     p = Path(duong_dan)
     ra = Path(cfg["ra"])
-    kq = dict(duong_dan=rel, goc=p.resolve().as_uri(), so_trang=0, trang_van_ban="", trang_thai="LOI", canh_bao="", thong_tin="",
+    kq = dict(duong_dan=rel, goc=p.resolve().as_uri(), so_trang=0, trang_van_ban="", trang_thai="LOI", canh_bao="",
+              nghi_thieu_trang="", thong_tin="",
               nhan_trang="", thoi_gian=0.0, chi_tiet=[], anh=[], van_ban=[])
     try:
         src = pymupdf.open(str(p))
@@ -568,6 +760,14 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
             for d in doan:
                 a, b = min(d["trang"]), max(d["trang"])
                 d["trang"] = sorted(set(d["trang"]) | {i for i in range(a, b + 1) if trang[i]["nhan"] == "TT"})
+        # kiểm tra thiếu / thừa / trùng trang trong từng văn bản đã tách
+        nghi_thieu = []
+        for k, d in enumerate(doan):
+            tien_to = f"VB{k+1}: " if len(doan) > 1 else ""
+            nghi, dat = kiem_tra_trang(d, trang, doc)
+            nghi_thieu += [tien_to + x for x in nghi]
+            thong_tin += [tien_to + x for x in dat]
+        canh_bao += ["số trang: " + x for x in nghi_thieu]
         so_trang_trang = sum(t["nhan"] == "TT" for t in trang)
         if so_trang_trang:
             thong_tin.append(f"{so_trang_trang} trang trắng")
@@ -592,6 +792,7 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
             trang_van_ban=";".join(khoang(d["trang"]) for d in doan),
             trang_thai=trang_thai,
             canh_bao=" | ".join(canh_bao),
+            nghi_thieu_trang=" | ".join(nghi_thieu),
             thong_tin=" · ".join(thong_tin),
             nhan_trang=" ".join(f"{i+1}:{t['nhan']}" for i, t in enumerate(trang)),
             chi_tiet=[dict(nhan=t["nhan"], ly_do=t["ly_do"], vb=trong_vb.get(i, 0)) for i, t in enumerate(trang)],
@@ -630,7 +831,8 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
 # 5. BÁO CÁO
 # =====================================================================
 
-COT_CSV = ["duong_dan", "so_trang", "trang_van_ban", "trang_thai", "canh_bao", "thong_tin", "nhan_trang", "thoi_gian"]
+COT_CSV = ["duong_dan", "so_trang", "trang_van_ban", "trang_thai", "nghi_thieu_trang", "canh_bao", "thong_tin",
+           "nhan_trang", "thoi_gian"]
 THU_TU = {"LOI": 0, "KHONG_THAY": 1, "CAN_KIEM_TRA": 2, "DAT": 3}
 MAU_NHAN = {"MD": "#2563eb", "TH": "#60a5fa", "LC": "#16a34a", "HS": "#9ca3af", "TT": "#e5e7eb", "KR": "#f59e0b"}
 MAU_TT = {"DAT": "#16a34a", "CAN_KIEM_TRA": "#d97706", "KHONG_THAY": "#dc2626", "LOI": "#7f1d1d"}
@@ -666,7 +868,7 @@ def ghi_xlsx(ds: list[dict], f: Path):
         ws.cell(hang, 4).fill = PatternFill("solid", fgColor=nen.get(r["trang_thai"], "FFFFFF"))
     for hang in range(ws.max_row + 1, ws.max_row + 200):
         ws.cell(hang, 3).number_format = "@"
-    for cot, rong in zip("ABCDEFGH", (45, 9, 18, 15, 70, 22, 60, 9)):
+    for cot, rong in zip("ABCDEFGHI", (45, 9, 18, 15, 45, 70, 40, 60, 9)):
         ws.column_dimensions[cot].width = rong
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
@@ -698,17 +900,22 @@ def ghi_html(ds: list[dict], f: Path):
             o.append(f'<figure class="{vien}" title="{e(ct["ly_do"])}">{anh}<figcaption>'
                      f'<b>{i+1}</b> <span style="background:{MAU_NHAN[ct["nhan"]]}">{NHAN_TEN[ct["nhan"]]}</span>{nhan_vb}'
                      f'</figcaption></figure>')
-        the.append(f'''<section data-tt="{r["trang_thai"]}">
+        the.append(f'''<section data-tt="{r["trang_thai"]}" data-thieu="{1 if r.get("nghi_thieu_trang") else 0}">
 <h3><span class="tt" style="background:{MAU_TT.get(r["trang_thai"], "#000")}">{r["trang_thai"]}</span> {e(r["duong_dan"])}</h3>
 <p>Trang văn bản: <b>{e(r["trang_van_ban"] or "—")}</b> / {r["so_trang"]} trang · {e(r["thong_tin"])}</p>
+{f'<p class="thieu">📄 Số trang: {e(r["nghi_thieu_trang"])}</p>' if r.get("nghi_thieu_trang") else ""}
 {f'<p class="cb">⚠ {e(r["canh_bao"])}</p>' if r["canh_bao"] else ""}
 <div class="luoi">{"".join(o)}</div></section>''')
     nut = "".join(f'<button onclick="loc(\'{k}\')">{k} ({v})</button>' for k, v in dem.items() if v)
+    so_thieu = sum(1 for r in ds if r.get("nghi_thieu_trang"))
+    if so_thieu:
+        nut += f'<button onclick="loc(\'THIEU\')">Nghi thiếu/thừa trang ({so_thieu})</button>'
+
     f.write_text(f'''<!DOCTYPE html><html lang="vi"><head><meta charset="utf-8"><title>Xem lại tách văn bản</title>
 <style>
 body{{font:14px system-ui,sans-serif;margin:20px;color:#111;background:#fafafa}}
 section{{background:#fff;border:1px solid #ddd;border-radius:8px;padding:12px 16px;margin:14px 0}}
-h3{{margin:0 0 6px;font-size:15px}} p{{margin:4px 0}} .cb{{color:#b45309}}
+h3{{margin:0 0 6px;font-size:15px}} p{{margin:4px 0}} .cb{{color:#b45309}} .thieu{{color:#b91c1c;font-weight:600}}
 .tt{{color:#fff;padding:2px 8px;border-radius:4px;font-size:12px}}
 .luoi{{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}}
 figure{{margin:0;width:130px;border:3px solid #ddd;border-radius:4px;background:#fff}}
@@ -723,7 +930,7 @@ Sửa sai: mở <code>bao_cao.xlsx</code>, sửa cột <code>trang_van_ban</code
 File DAT không có ảnh thu nhỏ trừ khi chạy với <code>--xem-tat-ca</code>.</p>
 <p>Lọc: <button onclick="loc('')">Tất cả</button>{nut}</p>
 {"".join(the)}
-<script>function loc(t){{document.querySelectorAll('section').forEach(s=>s.style.display=(!t||s.dataset.tt==t)?'':'none')}}</script>
+<script>function loc(t){{document.querySelectorAll('section').forEach(s=>s.style.display=(!t||s.dataset.tt==t||(t=='THIEU'&&s.dataset.thieu=='1'))?'':'none')}}</script>
 </body></html>''', encoding="utf-8")
 
 

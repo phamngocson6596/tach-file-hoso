@@ -66,6 +66,10 @@ class Trang:
         self.d.ellipse((x, y, x + 260, y + 260), outline=60, width=5)
         self.d.text((x + 30, y + 115), s, font=font(20, True), fill=60)
 
+    def so_trang(self, k):
+        self.d.text((W - 140, H - 120), str(k), font=F, fill=20)
+        return self
+
     def scan(self, nghieng=True):
         img = self.img
         if nghieng:
@@ -111,7 +115,7 @@ def hd_ky():
     return t
 
 
-def loi_chung(tach=False, ngay="ngày 15 tháng 3 năm 2022", so="1234", quyen="02/2022", vp="Hòa An"):
+def loi_chung(tach=False, ngay="ngày 15 tháng 3 năm 2022", so="1234", quyen="02/2022", vp="Hòa An", so_trang=None):
     t = Trang(); t.y = 160
     t.giua("LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN", FT, 30)
     t.doan(f"Hôm nay, {ngay}, tại Văn phòng công chứng {vp}, Thành phố Hồ Chí Minh, "
@@ -125,6 +129,9 @@ def loi_chung(tach=False, ngay="ngày 15 tháng 3 năm 2022", so="1234", quyen="
         tt = t2
     else:
         tt = t
+    if so_trang:
+        tt.doan(f"- Văn bản công chứng này được lập thành 03 (ba) bản chính, mỗi bản chính gồm "
+                f"{(so_trang + 1) // 2:02d} tờ, {so_trang:02d} trang, có giá trị pháp lý như nhau.")
     tt.doan(f"Số công chứng {so}, quyển số {quyen} TP/CC-SCC/HĐGD.")
     tt.y += 30
     tt.d.text((820, tt.y), "CÔNG CHỨNG VIÊN", font=FB, fill=20)
@@ -221,7 +228,23 @@ def tao_tat_ca(ra):
         hd_dau("HỢP ĐỒNG THẾ CHẤP QUYỀN SỬ DỤNG ĐẤT"), hd_ky(), *loi_chung(so="1235"), cccd(),
         hd_dau("HỢP ĐỒNG MUA BÁN NHÀ Ở"), hd_ky(),
         *loi_chung(ngay="ngày 02 tháng 8 năm 2015", so="567", quyen="01/2015", vp="Sài Gòn Mới"), gcn()], ra)
-    print(f"Đã tạo 8 file thử trong {ra}/")
+    # --- kiểm tra thiếu/thừa trang: văn bản có in số trang ---
+    def danh_so(ds):
+        return [t.so_trang(k + 1) for k, t in enumerate(ds)]
+
+    # mất trang 3/5 (lời chứng ghi 5 trang, có số trang in)
+    vb = danh_so([hd_dau(), hd_giua(), hd_giua(7), hd_ky(), *loi_chung(so_trang=5)])
+    ghi("J_thieu_trang_giua.pdf", [phieu_yc(), vb[0], vb[1], vb[3], vb[4], cccd()], ra)
+    # trang 2 bị scan 2 lần (lời chứng ghi 4 trang)
+    vb = danh_so([hd_dau(), hd_giua(), hd_ky(), *loi_chung(so_trang=4)])
+    ghi("K_trang_scan_trung.pdf", [vb[0], vb[1], vb[1], vb[2], vb[3], gcn()], ra)
+    # lời chứng không ghi số trang: chỉ còn số trang in và số Điều để phát hiện mất trang 2
+    vb = danh_so([hd_dau(), hd_giua(), hd_giua(7), hd_ky(), *loi_chung()])
+    ghi("L_thieu_trang_khong_ghi_so_trang.pdf", [vb[0], vb[2], vb[3], vb[4], cccd()], ra)
+    # đủ trang (đối chứng): phải ĐẠT
+    vb = danh_so([hd_dau(), hd_giua(), hd_ky(), *loi_chung(so_trang=4)])
+    ghi("M_du_trang.pdf", [phieu_yc(), *vb, gcn()], ra)
+    print(f"Đã tạo 12 file thử trong {ra}/")
 
 
 if __name__ == "__main__":
