@@ -106,7 +106,7 @@ CHU_IT = 150               # dưới mức này -> trang ít chữ (ảnh, CCCD,
 
 NHAN_TEN = {
     "MD": "Mở đầu", "TH": "Thân", "LC": "Lời chứng", "HS": "Hồ sơ",
-    "TT": "Trang trắng", "KR": "Không rõ",
+    "TT": "Trang trắng", "KR": "Không rõ", "TR": "Trùng",
 }
 
 
@@ -519,11 +519,12 @@ def doc_trang(page, cfg) -> dict:
         r = page.rect
         tu = [[w[4], w[0] / r.width, w[1] / r.height, w[2] / r.width, w[3] / r.height, "%d.%d" % (w[5], w[6])]
               for w in page.get_text("words")]
-        return dict(text=lop_chu, muc=muc, nguon="lop_chu", so_in=tim_so_trang_in(tu))
+        return dict(text=lop_chu, muc=muc, nguon="lop_chu", so_in=tim_so_trang_in(tu), ma_anh=ma_anh(page))
     if muc < MUC_BO_QUA_OCR:  # gần như không có điểm mực nào -> khỏi OCR cho nhanh
-        return dict(text="", muc=muc, nguon="trang", so_in=None)
+        return dict(text="", muc=muc, nguon="trang", so_in=None, ma_anh=None)
     text, tu = ocr_anh(img, cfg)
-    return dict(text=text, muc=muc, nguon=cfg["engine"], so_in=tim_so_trang_in(tu) if tu else None)
+    return dict(text=text, muc=muc, nguon=cfg["engine"], so_in=tim_so_trang_in(tu) if tu else None,
+                ma_anh=ma_anh(page))
 
 
 # ---------- Số trang in trên trang ("1", "- 2 -", "Trang 3/5") ----------
@@ -565,35 +566,104 @@ def tim_so_trang_in(tu) -> list | None:
 
 
 # ---------- Kiểm tra thiếu trang / trùng trang trong 1 văn bản ----------
-_SO_CHU = {"MOT": 1, "HAI": 2, "BA": 3, "BON": 4, "TU": 4, "NAM": 5, "SAU": 6, "BAY": 7, "TAM": 8, "CHIN": 9, "MUOI": 10}
-_SO_HOAC_CHU = r"([0-9O]{1,3}|" + "|".join(_SO_CHU) + r")(?: \(?[A-Z]+\)?){0,2}"
-M_TO_TRANG = re.compile(r"\bG[O0]M " + _SO_HOAC_CHU + r" T[O0] " + _SO_HOAC_CHU + r" TRANG\b")
-M_CHI_TRANG = re.compile(r"\bG[O0]M " + _SO_HOAC_CHU + r" TRANG\b")
-M_CHI_TO = re.compile(r"\bG[O0]M " + _SO_HOAC_CHU + r" T[O0]\b")
+_SO_DON = {"KHONG": 0, "MOT": 1, "MOTT": 1, "HAI": 2, "BA": 3, "BON": 4, "TU": 4, "NAM": 5, "LAM": 5,
+           "SAU": 6, "BAY": 7, "TAM": 8, "CHIN": 9}
 M_DIEU_DAU_DONG = re.compile(r"^D[I1L]EU ?(\d{1,2})\b")
 
 
-def _doc_so(x: str) -> int:
-    return _SO_CHU[x] if x in _SO_CHU else int(x.replace("O", "0"))
+def _so_tu_chu(tu: list[str]):
+    """['HAI','MUOI','MOT'] -> 21; ['MUOI','HAI'] -> 12; ['BA'] -> 3; không hiểu -> None."""
+    tu = [x for x in tu if x not in ("LINH", "LE")]
+    if not tu:
+        return None
+    if "MUOI" not in tu:
+        return _SO_DON.get(tu[-1]) if len(tu) == 1 else None
+    k = tu.index("MUOI")
+    chuc = _SO_DON.get(tu[k - 1]) if k > 0 else 1
+    dv = _SO_DON.get(tu[k + 1]) if k + 1 < len(tu) else 0
+    return None if chuc is None or dv is None else chuc * 10 + dv
+
+
+def _so_dung_truoc(tu: list[str]):
+    """Con số đứng ngay trước chữ 'tờ'/'trang': '02 (hai)' / '02' / 'hai mươi mốt'."""
+    chu = []
+    for x in reversed(tu[-5:]):
+        if re.fullmatch(r"[0-9O]{1,3}", x) and any(c.isdigit() for c in x):
+            return int(x.replace("O", "0"))
+        if x in _SO_DON or x in ("MUOI", "LINH", "LE"):
+            chu.insert(0, x)
+            continue
+        break
+    return _so_tu_chu(chu)
 
 
 def so_trang_theo_loi_chung(chu_lc: str):
-    """'…mỗi bản chính gồm 02 (hai) tờ, 02 (hai) trang' -> (số tờ, số trang); thiếu thì None."""
-    m = M_TO_TRANG.search(chu_lc)
-    if m:
-        return _doc_so(m.group(1)), _doc_so(m.group(2))
-    m = M_CHI_TRANG.search(chu_lc)
-    if m:
-        return None, _doc_so(m.group(1))
-    m = M_CHI_TO.search(chu_lc)
-    if m:
-        return _doc_so(m.group(1)), None
+    """'…mỗi bản chính gồm 02 (hai) tờ, 02 (hai) trang' -> (số tờ, số trang); thiếu thì None.
+    Nhận cả 'bao gồm', 'gồm có', số viết bằng chữ, chữ số 0 bị OCR đọc thành O."""
+    tu = chu_lc.split()
+    for k, w in enumerate(tu):
+        if w not in ("GOM", "G0M"):
+            continue
+        so_to = so_tr = None
+        cua_so = tu[k + 1:k + 18]
+        for j, x in enumerate(cua_so):
+            if x in ("TO", "T0") and so_to is None:
+                so_to = _so_dung_truoc(cua_so[:j])
+            elif x == "TRANG" and so_tr is None:
+                so_tr = _so_dung_truoc(cua_so[:j])
+                break
+        if so_to or so_tr:
+            return so_to, so_tr
     return None, None
+
+
+# ---------- Trang scan trùng ----------
+def ma_anh(page) -> str:
+    """Mã hình ảnh 256 bit (dHash) của trang, để so trang ít chữ (trang ký, lời chứng ngắn)."""
+    pix = page.get_pixmap(dpi=24, colorspace=pymupdf.csGRAY, alpha=False)
+    img = Image.frombuffer("L", (pix.width, pix.height), pix.samples, "raw", "L", pix.stride, 1).resize((17, 16))
+    px = img.tobytes()  # ảnh xám: mỗi điểm 1 byte
+    bit = "".join("1" if px[r * 17 + c] > px[r * 17 + c + 1] else "0" for r in range(16) for c in range(16))
+    return "%064x" % int(bit, 2)
+
+
+def _cac_dieu(text: str) -> list[int]:
+    return [int(m.group(1)) for dong in text.splitlines() for m in [M_DIEU_DAU_DONG.match(bo_dau(dong))] if m]
+
+
+def _giong_het(a: dict, b: dict) -> bool:
+    import difflib
+    ta, tb = bo_dau(a.get("text", "")), bo_dau(b.get("text", ""))
+    if min(len(ta), len(tb)) > 200:
+        sm = difflib.SequenceMatcher(None, ta, tb, autojunk=False)
+        return sm.quick_ratio() > 0.95 and sm.ratio() > 0.93
+    ha, hb = a.get("ma_anh"), b.get("ma_anh")
+    if not ha or not hb or bin(int(ha, 16) ^ int(hb, 16)).count("1") > 12:
+        return False
+    if max(len(ta), len(tb)) > 30:  # trang có ít chữ thì chữ cũng phải gần như giống
+        return difflib.SequenceMatcher(None, ta, tb, autojunk=False).ratio() > 0.85
+    return True
+
+
+def tim_trang_trung(doc: list[dict], trang: list[dict]) -> dict[int, int]:
+    """Trang bị scan 2 lần liền nhau (bỏ qua trang trắng ở giữa), chỉ xét trang thuộc văn bản (không xét giấy tờ
+    hồ sơ: hai bản CCCD giống bố cục là chuyện bình thường). Trả {trang lặp: trang gốc}."""
+    trung, truoc = {}, None
+    for i, t in enumerate(trang):
+        if t["nhan"] == "TT":
+            continue
+        if truoc is not None and t["nhan"] != "HS" and trang[truoc]["nhan"] != "HS":
+            sa, sb = doc[truoc].get("so_in"), doc[i].get("so_in")
+            khac = (sa and sb and sa != sb) or _cac_dieu(doc[truoc]["text"]) != _cac_dieu(doc[i]["text"])
+            if not khac and _giong_het(doc[truoc], doc[i]):
+                trung[i] = trung.get(truoc, truoc)
+                continue  # giữ "truoc" là bản gốc nếu bị scan 3 lần
+        truoc = i
+    return trung
 
 
 def kiem_tra_trang(d: dict, trang: list[dict], doc: list[dict]) -> tuple[list[str], list[str]]:
     """Trả về (các dấu hiệu nghi thiếu/thừa/trùng trang, các xác nhận đủ trang)."""
-    import difflib
     ds = [i for i in sorted(d["trang"]) if trang[i]["nhan"] != "TT"]
     n = len(ds)
     nghi, dat = [], []
@@ -653,16 +723,11 @@ def kiem_tra_trang(d: dict, trang: list[dict], doc: list[dict]) -> tuple[list[st
     if not khop_loi_chung:
         nghi += nhay
 
-    # 4. Trang scan trùng (hai trang liền nhau gần như giống hệt; khác số Điều hoặc số trang in thì không phải)
-    for k in range(1, n):
-        i1, i2 = ds[k - 1], ds[k]
-        if cac_dieu(i1) != cac_dieu(i2) or (doc[i1].get("so_in") and doc[i2].get("so_in")
-                                            and doc[i1]["so_in"] != doc[i2]["so_in"]):
-            continue
-        a, b = bo_dau(doc[i1]["text"]), bo_dau(doc[i2]["text"])
-        if min(len(a), len(b)) > 300 and difflib.SequenceMatcher(None, a, b, autojunk=False).quick_ratio() > 0.95 \
-                and difflib.SequenceMatcher(None, a, b, autojunk=False).ratio() > 0.93:
-            nghi.append(f"tr.{ds[k-1]+1} và tr.{ds[k]+1} gần như giống hệt (scan trùng?)")
+    # 4. Hai trang KHÔNG liền nhau trong văn bản giống hệt (trùng liền nhau đã được bỏ trước khi ghép trang)
+    for x in range(n):
+        for y in range(x + 2, n):
+            if _giong_het(doc[ds[x]], doc[ds[y]]):
+                nghi.append(f"tr.{ds[x]+1} và tr.{ds[y]+1} gần như giống hệt (scan trùng?)")
     return nghi, dat
 
 
@@ -811,7 +876,15 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
             f_txt.write_text("".join(f"\n===== TRANG {i+1} ({d['nguon']}) =====\n{d['text']}"
                                      for i, d in enumerate(doc)), encoding="utf-8")
         # --- gắn nhãn & ghép ---
+        if any("ma_anh" not in d for d in doc):  # cache cũ chưa có mã ảnh: tính bổ sung (nhanh) rồi lưu lại
+            for i, d in enumerate(doc):
+                if "ma_anh" not in d:
+                    d["ma_anh"] = ma_anh(src[i]) if d["nguon"] != "trang" else None
+            f_cache.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
         trang = [phan_tich_trang(d["text"], d["muc"], cfg["nguong_trang"]) for d in doc]
+        trung = tim_trang_trung(doc, trang)
+        for j, i in trung.items():  # trang scan lặp: coi như trang trắng khi ghép văn bản
+            trang[j].update(nhan="TT", trung=i, ly_do=f"trùng tr.{i+1} (scan 2 lần)")
         doan, cb_file = chia_van_ban(trang, cfg["can_quoc_hieu"])
         info = [thong_tin_doan(d, trang, [x["text"] for x in doc]) for d in doan]
         canh_bao, thong_tin = list(cb_file), []
@@ -855,16 +928,19 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
         if cfg["giu_trang_trang"]:
             for d in doan:
                 a, b = min(d["trang"]), max(d["trang"])
-                d["trang"] = sorted(set(d["trang"]) | {i for i in range(a, b + 1) if trang[i]["nhan"] == "TT"})
+                d["trang"] = sorted(set(d["trang"]) | {i for i in range(a, b + 1)
+                                                       if trang[i]["nhan"] == "TT" and "trung" not in trang[i]})
         # kiểm tra thiếu / thừa / trùng trang trong từng văn bản đã tách
-        nghi_thieu = []
+        trong_doan = {x for d in doan if d["trang"] for x in range(min(d["trang"]), max(d["trang"]) + 1)}
+        nghi_thieu = [f"tr.{j+1} trùng tr.{i+1} (scan 2 lần), đã bỏ khỏi văn bản"
+                      for j, i in sorted(trung.items()) if i in trong_doan or j in trong_doan]
         for k, d in enumerate(doan):
             tien_to = f"VB{k+1}: " if len(doan) > 1 else ""
             nghi, dat = kiem_tra_trang(d, trang, doc)
             nghi_thieu += [tien_to + x for x in nghi]
             thong_tin += [tien_to + x for x in dat]
         canh_bao += ["số trang: " + x for x in nghi_thieu]
-        so_trang_trang = sum(t["nhan"] == "TT" for t in trang)
+        so_trang_trang = sum(t["nhan"] == "TT" and "trung" not in t for t in trang)
         if so_trang_trang:
             thong_tin.append(f"{so_trang_trang} trang trắng")
         ocr_n = sum(d["nguon"] not in ("lop_chu", "trang") for d in doc)
@@ -895,7 +971,8 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
             loai_van_ban="; ".join(x["loai"] for x in info).strip("; "),
             thong_tin=" · ".join(thong_tin),
             nhan_trang=" ".join(f"{i+1}:{t['nhan']}" for i, t in enumerate(trang)),
-            chi_tiet=[dict(nhan=t["nhan"], ly_do=t["ly_do"], vb=trong_vb.get(i, 0)) for i, t in enumerate(trang)],
+            chi_tiet=[dict(nhan="TR" if "trung" in t else t["nhan"], ly_do=t["ly_do"], vb=trong_vb.get(i, 0))
+                      for i, t in enumerate(trang)],
         )
         # --- xuất PDF (tên theo mẫu được đặt ở tiến trình chính, để tránh trùng tên giữa các file) ---
         thu_muc = "dat" if trang_thai == "DAT" else "can_kiem_tra"
@@ -952,7 +1029,8 @@ RONG_COT = {"duong_dan": 42, "so_trang": 8, "trang_van_ban": 16, "trang_thai": 1
             "so_cong_chung": 14, "ngay_cong_chung": 14, "loai_van_ban": 34, "file_van_ban": 34, "canh_bao": 60,
             "thong_tin": 40, "nhan_trang": 50, "thoi_gian": 8}
 THU_TU = {"LOI": 0, "KHONG_THAY": 1, "CAN_KIEM_TRA": 2, "DAT": 3}
-MAU_NHAN = {"MD": "#2563eb", "TH": "#60a5fa", "LC": "#16a34a", "HS": "#9ca3af", "TT": "#e5e7eb", "KR": "#f59e0b"}
+MAU_NHAN = {"MD": "#2563eb", "TH": "#60a5fa", "LC": "#16a34a", "HS": "#9ca3af", "TT": "#e5e7eb", "KR": "#f59e0b",
+            "TR": "#a855f7"}
 MAU_TT = {"DAT": "#16a34a", "CAN_KIEM_TRA": "#d97706", "KHONG_THAY": "#dc2626", "LOI": "#7f1d1d"}
 
 

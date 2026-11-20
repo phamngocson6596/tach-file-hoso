@@ -700,13 +700,13 @@ def tu_kiem_tra(thu_muc: str) -> int:
         tt = {r["duong_dan"][0]: r["trang_thai"] for r in kq}
         nghi_trang = {r["duong_dan"][0] for r in kq if r.get("nghi_thieu_trang")}
         mong_doi_dat = {"A", "B", "E", "H", "M"}
-        mong_doi_nghi_trang = {"J", "K", "L"}
+        mong_doi_nghi_trang = {"J", "K", "L", "N", "O", "P"}
         loi = [r["duong_dan"] for r in kq if r["trang_thai"] == "LOI"]
         thieu = sorted(k for k in mong_doi_dat if tt.get(k) != "DAT")
         sai_trang = sorted(mong_doi_nghi_trang ^ nghi_trang)
         nhat_ky.append(f"Trạng thái: {tt}")
         nhat_ky.append(f"Nghi thiếu/thừa trang: {sorted(nghi_trang)}")
-        dat = len(kq) == 12 and not loi and not thieu and not sai_trang
+        dat = len(kq) == 15 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")
         nhat_ky.append("KẾT QUẢ: ĐẠT" if dat else f"KẾT QUẢ: KHÔNG ĐẠT (lỗi: {loi}, không đạt như mong đợi: {thieu})")

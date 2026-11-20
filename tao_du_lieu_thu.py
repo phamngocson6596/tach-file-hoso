@@ -244,7 +244,19 @@ def tao_tat_ca(ra):
     # đủ trang (đối chứng): phải ĐẠT
     vb = danh_so([hd_dau(), hd_giua(), hd_ky(), *loi_chung(so_trang=4)])
     ghi("M_du_trang.pdf", [phieu_yc(), *vb, gcn()], ra)
-    print(f"Đã tạo 12 file thử trong {ra}/")
+    # trang tiêu đề bị scan 2 lần (trước đây bị hiểu nhầm thành 2 văn bản)
+    vb = danh_so([hd_dau(), hd_giua(), hd_ky(), *loi_chung(so_trang=4)])
+    ghi("N_trung_trang_tieu_de.pdf", [phieu_yc(), vb[0], vb[0], vb[1], vb[2], vb[3], gcn()], ra)
+    # trang ký (rất ít chữ) bị scan 2 lần: phải so bằng hình ảnh
+    vb = danh_so([hd_dau(), hd_giua(), hd_ky(), *loi_chung(so_trang=4)])
+    ghi("O_trung_trang_ky.pdf", [vb[0], vb[1], vb[2], vb[2], vb[3], cccd()], ra)
+    # lời chứng ghi số trang bằng chữ, bị thiếu 1 trang
+    vb = [hd_dau(), hd_giua(), hd_giua(7), hd_ky(), *loi_chung()]
+    lc = vb[-1]
+    lc.y = 1250
+    lc.doan("Văn bản này bao gồm năm trang.")
+    ghi("P_thieu_trang_so_bang_chu.pdf", [vb[0], vb[1], vb[3], vb[4]], ra)
+    print(f"Đã tạo 15 file thử trong {ra}/")
 
 
 if __name__ == "__main__":
