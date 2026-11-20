@@ -53,9 +53,12 @@ Nếu lỡ quên tick Vietnamese thì không cần cài lại. Mở giao diện 
 
 ### Cập nhật lên bản mới
 
-- **Bộ cài:** khi có bản mới, phần mềm hiện dòng màu xanh *"Đã có bản mới …"* ở đầu cửa sổ. Bấm **Tải bản mới**, đóng phần mềm, rồi chạy file vừa tải và bấm Next.
-  - Không cần gỡ bản cũ.
-  - Khi bộ cài hỏi, chọn cùng kiểu cài như lần đầu ("chỉ cho tôi" hay "cho mọi người dùng").
+- **Bộ cài:** khi có bản mới, phần mềm hiện dòng màu xanh *"Đã có bản mới …"* ở đầu cửa sổ. Bấm **⬆ Cập nhật ngay**, phần mềm sẽ:
+  1. tải bộ cài mới (khoảng 45 MB) và kiểm tra mã băm SHA-256 với GitHub;
+  2. tự đóng lại, cài bản mới ở chế độ im lặng vào đúng thư mục cũ;
+  3. tự mở lại.
+
+  Nếu lúc đầu cài "cho mọi người dùng", Windows sẽ hỏi quyền quản trị. Có từ bản 0.3.5; bản cũ hơn thì tải bộ cài và chạy bằng tay một lần.
 - **Bản zip:** xoá thư mục cũ, giải nén bản mới vào cùng chỗ.
 - Cấu hình, gói tiếng Việt đã tải và thư mục kết quả đều được giữ nguyên.
 - Có thể bấm **Kiểm tra bản mới** ở góc phải trên bất cứ lúc nào.

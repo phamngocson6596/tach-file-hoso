@@ -58,3 +58,16 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExe}"; Tasks: deskto
 
 [Run]
 Filename: "{app}\{#MyAppExe}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+; Cập nhật từ trong phần mềm (bộ cài chạy im lặng với /KHOIDONGLAI): mở lại phần mềm sau khi cài xong
+Filename: "{app}\{#MyAppExe}"; Flags: nowait postinstall runasoriginaluser; Check: CoThamSo('/KHOIDONGLAI')
+
+[Code]
+function CoThamSo(const Ten: String): Boolean;
+var
+  I: Integer;
+begin
+  Result := False;
+  for I := 1 to ParamCount do
+    if CompareText(ParamStr(I), Ten) = 0 then
+      Result := True;
+end;

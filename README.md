@@ -32,7 +32,7 @@ Link trên luôn trỏ tới bản mới nhất. Các bản trước xem ở tra
 1. Windows có thể hiện cảnh báo *"Windows protected your PC"* vì file chưa được ký số. Bấm **More info**, rồi **Run anyway**.
 2. Chọn thư mục PDF scan và thư mục kết quả, khai báo cấu trúc hồ sơ của đơn vị, rồi bấm **Bắt đầu tách**. Lần đầu nên **chạy thử 50 file** và soát kỹ.
 
-**Cập nhật:** từ bản 0.3.3, khi có bản mới, phần mềm hiện dòng *"Đã có bản mới …"*. Bấm **Tải bản mới**, đóng phần mềm, rồi chạy file vừa tải. Không cần gỡ bản cũ; cấu hình và kết quả cũ được giữ nguyên. Người đang dùng bản 0.3.2 trở về trước cần tự tải bộ cài mới một lần.
+**Cập nhật:** khi có bản mới, phần mềm hiện dòng *"Đã có bản mới …"*. Từ bản 0.3.5, bấm **⬆ Cập nhật ngay** là phần mềm tự tải bộ cài (có kiểm tra mã băm SHA-256 với GitHub), tự cài rồi tự mở lại; cấu hình và kết quả cũ được giữ nguyên. Bản 0.3.4 trở về trước thì cần tự tải bộ cài mới một lần.
 
 Hướng dẫn chi tiết, ý nghĩa từng tuỳ chọn và cách sửa tay: **[HUONG_DAN.md](HUONG_DAN.md)**.
 

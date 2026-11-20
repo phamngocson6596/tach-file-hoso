@@ -149,14 +149,17 @@ class UngDung(tk.Tk):
         ttk.Button(self.dai_moi, text="Ẩn", width=5, command=self.dai_moi.grid_remove).pack(side="right", padx=6, pady=4)
         ttk.Button(self.dai_moi, text="Xem có gì mới", command=lambda: webbrowser.open(self._ban_moi["trang"])) \
             .pack(side="right", padx=(0, 4), pady=4)
-        ttk.Button(self.dai_moi, text="⬇ Tải bản mới", command=self._tai_ban_moi).pack(side="right", padx=4, pady=4)
+        tu_cai = self.tvb.la_ban_cai()
+        self.nut_cap_nhat = ttk.Button(self.dai_moi, text="⬆ Cập nhật ngay" if tu_cai else "⬇ Tải bản mới",
+                                       command=self._cap_nhat_ngay)
+        self.nut_cap_nhat.pack(side="right", padx=4, pady=4)
         self.lb_moi = tk.Label(self.dai_moi, text="", bg="#dcfce7", fg="#14532d", font=("Segoe UI", 10, "bold"))
         self.lb_moi.pack(side="left", padx=10, pady=6)
-        w = tk.Label(self.dai_moi, text="Tải về rồi chạy file vừa tải để cập nhật (đóng phần mềm này trước).",
-                     bg="#dcfce7", fg="#166534", anchor="w")
-        w.pack(side="left", fill="x", expand=True)
-        GoiY(w, "Không cần gỡ bản cũ: bộ cài tự ghi đè lên bản đang dùng. "
-                "Cấu hình, gói tiếng Việt và thư mục kết quả cũ được giữ nguyên.")
+        self.lb_moi_phu = tk.Label(self.dai_moi, bg="#dcfce7", fg="#166534", anchor="w",
+                                   text="Bấm Cập nhật ngay: phần mềm tự tải, tự cài rồi tự mở lại." if tu_cai else
+                                   "Bản không cần cài: tải file zip mới, giải nén đè lên thư mục cũ.")
+        self.lb_moi_phu.pack(side="left", fill="x", expand=True)
+        GoiY(self.lb_moi_phu, "Không cần gỡ bản cũ. Cấu hình, gói tiếng Việt và thư mục kết quả cũ được giữ nguyên.")
         self._ban_moi = None
 
         self.dai_moi.grid(row=1, column=0, columnspan=2, sticky="ew", pady=(0, 8))
@@ -468,6 +471,30 @@ class UngDung(tk.Tk):
 
         threading.Thread(target=chay, daemon=True).start()
 
+    def _cap_nhat_ngay(self):
+        if not self.tvb.la_ban_cai():
+            self._tai_ban_moi()
+            return
+        if self.luong and self.luong.is_alive():
+            messagebox.showinfo("Đang chạy", "Đang tách dở. Chờ chạy xong (hoặc bấm Dừng) rồi hãy cập nhật.")
+            return
+        b = self._ban_moi or {}
+        if not messagebox.askyesno("Cập nhật", f"Cập nhật lên bản {b.get('phien_ban')}?\n\n"
+                                   "Phần mềm sẽ tải bộ cài (khoảng 45 MB), tự đóng lại, cài bản mới rồi tự mở lại. "
+                                   "Cấu hình và kết quả cũ được giữ nguyên."):
+            return
+        self.nut_cap_nhat.configure(state="disabled")
+        self.lb_moi_phu.configure(text="Đang tải bộ cài…")
+
+        def chay():
+            try:
+                f = self.tvb.tai_bo_cai(b, tien_do=lambda da, tong: self.q.put(("cap_nhat_tien_do", (da, tong))))
+                self.q.put(("cap_nhat_xong", str(f)))
+            except Exception as e:
+                self.q.put(("cap_nhat_loi", str(e)))
+
+        threading.Thread(target=chay, daemon=True).start()
+
     def _tai_ban_moi(self):
         b = self._ban_moi or {}
         if self.tvb.la_ban_cai():
@@ -637,6 +664,27 @@ class UngDung(tk.Tk):
                                                f"Có thể xem trực tiếp tại {self.tvb.URL_KHO}/releases")
                     elif not tu_dong:
                         messagebox.showinfo("Bản mới nhất", f"Bạn đang dùng bản mới nhất ({self.tvb.PHIEN_BAN}).")
+                elif loai == "cap_nhat_tien_do":
+                    da, tong = gt
+                    self.lb_moi_phu.configure(text=f"Đang tải bộ cài… {da / 1048576:.1f}"
+                                                   + (f" / {tong / 1048576:.1f} MB" if tong else " MB"))
+                elif loai == "cap_nhat_loi":
+                    self.nut_cap_nhat.configure(state="normal")
+                    self.lb_moi_phu.configure(text="Tải bộ cài không thành công.")
+                    if messagebox.askyesno("Không cập nhật được", f"{gt}\n\nMở trang tải để cập nhật bằng tay?"):
+                        webbrowser.open((self._ban_moi or {}).get("trang") or self.tvb.URL_KHO + "/releases/latest")
+                elif loai == "cap_nhat_xong":
+                    self.lb_moi_phu.configure(text="Đang mở bộ cài, phần mềm sẽ tự mở lại sau khi cài xong…")
+                    self.update()
+                    try:
+                        self.tvb.chay_bo_cai(gt)
+                    except Exception as e:
+                        self.nut_cap_nhat.configure(state="normal")
+                        messagebox.showerror("Không chạy được bộ cài", f"{e}\n\nBộ cài đã tải về: {gt}")
+                    else:
+                        self._luu_cau_hinh()
+                        self.destroy()
+                        return
                 elif loai in ("goi_xong", "goi_loi"):
                     self.nut_tai_goi.configure(state="normal")
                     if loai == "goi_loi":

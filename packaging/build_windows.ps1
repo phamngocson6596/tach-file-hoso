@@ -106,6 +106,11 @@ if (-not $BoQuaBoCai) {
         $p = Start-Process -FilePath $setup -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CURRENTUSER", "/DIR=`"$caiThu`"" -Wait -PassThru
         if ($p.ExitCode -ne 0) { throw "Cài thử bộ cài lỗi (mã thoát $($p.ExitCode))" }
         Test-TuKiemTra "$caiThu\TachVanBan.exe" "ban_da_cai"
+        # Cài đè như khi cập nhật từ trong phần mềm (không truyền /DIR: bộ cài phải tự nhớ thư mục cũ)
+        $p = Start-Process -FilePath $setup -ArgumentList "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS" -Wait -PassThru
+        if ($p.ExitCode -ne 0) { throw "Cài đè (cập nhật) lỗi (mã thoát $($p.ExitCode))" }
+        if (-not (Test-Path "$caiThu\TachVanBan.exe")) { throw "Cài đè không ghi vào đúng thư mục cũ" }
+        Test-TuKiemTra "$caiThu\TachVanBan.exe" "ban_cai_de"
         Start-Process -FilePath "$caiThu\unins000.exe" -ArgumentList "/VERYSILENT", "/SUPPRESSMSGBOXES", "/NORESTART" -Wait | Out-Null
     }
 }

@@ -36,7 +36,7 @@ except ImportError:  # PyMuPDF bản cũ
     import fitz as pymupdf
 from PIL import Image
 
-PHIEN_BAN = "0.3.4"
+PHIEN_BAN = "0.3.5"
 
 # =====================================================================
 # 1. CHUẨN HOÁ CHỮ & TỪ KHOÁ
@@ -1334,9 +1334,60 @@ def kiem_tra_ban_moi(timeout: float = 6) -> dict | None:
     tag = d.get("tag_name") or ""
     if not _so_phien_ban(tag) or _so_phien_ban(tag) <= _so_phien_ban(PHIEN_BAN):
         return None
-    tai = {a.get("name"): a.get("browser_download_url") for a in d.get("assets", [])}
+    tai = {a.get("name"): a for a in d.get("assets", [])}
+    cai = tai.get("TachVanBan-CaiDat.exe") or {}
+    so_bam = (cai.get("digest") or "")
     return dict(phien_ban=tag.lstrip("vV"), trang=d.get("html_url") or f"{URL_KHO}/releases/latest",
-                tai_cai_dat=tai.get("TachVanBan-CaiDat.exe"), tai_zip=tai.get("TachVanBan-KhongCanCai.zip"))
+                tai_cai_dat=cai.get("browser_download_url"),
+                tai_zip=(tai.get("TachVanBan-KhongCanCai.zip") or {}).get("browser_download_url"),
+                kich_thuoc_cai_dat=cai.get("size"),
+                sha256_cai_dat=so_bam.split(":", 1)[1].lower() if so_bam.startswith("sha256:") else None)
+
+
+def tai_bo_cai(ban: dict, tien_do=None) -> Path:
+    """Tải bộ cài của bản mới vào thư mục tạm, kiểm tra kích thước và mã băm SHA-256 (nếu GitHub cung cấp)."""
+    import hashlib
+    import tempfile
+    import urllib.request
+    url = ban.get("tai_cai_dat")
+    if not url:
+        raise ValueError("bản phát hành này chưa có bộ cài TachVanBan-CaiDat.exe")
+    dich = Path(tempfile.gettempdir()) / f"TachVanBan-CaiDat-{ban['phien_ban']}.exe"
+    tam = dich.with_suffix(".dang_tai")
+    yc = urllib.request.Request(url, headers={"User-Agent": f"TachVanBan/{PHIEN_BAN}"})
+    h, da = hashlib.sha256(), 0
+    with urllib.request.urlopen(yc, timeout=60) as r, open(tam, "wb") as f:
+        tong = int(r.headers.get("Content-Length") or ban.get("kich_thuoc_cai_dat") or 0)
+        while True:
+            khoi = r.read(256 * 1024)
+            if not khoi:
+                break
+            f.write(khoi)
+            h.update(khoi)
+            da += len(khoi)
+            if tien_do:
+                tien_do(da, tong)
+    if ban.get("kich_thuoc_cai_dat") and da != ban["kich_thuoc_cai_dat"]:
+        tam.unlink(missing_ok=True)
+        raise ValueError(f"tải chưa đủ ({da}/{ban['kich_thuoc_cai_dat']} byte), hãy thử lại")
+    if ban.get("sha256_cai_dat") and h.hexdigest() != ban["sha256_cai_dat"]:
+        tam.unlink(missing_ok=True)
+        raise ValueError("mã băm của bộ cài không khớp với GitHub, đã huỷ để an toàn")
+    os.replace(tam, dich)
+    return dich
+
+
+def chay_bo_cai(duong_dan: Path, khoi_dong_lai: bool = True):
+    """Chạy bộ cài ở chế độ im lặng, tách hẳn khỏi phần mềm đang chạy (phần mềm phải tự thoát ngay sau đó).
+    Bộ cài tự giữ đúng thư mục và kiểu cài cũ; /KHOIDONGLAI để mở lại phần mềm sau khi cài xong."""
+    import subprocess
+    lenh = [str(duong_dan), "/SILENT", "/SUPPRESSMSGBOXES", "/NORESTART", "/CLOSEAPPLICATIONS"]
+    if khoi_dong_lai:
+        lenh.append("/KHOIDONGLAI")
+    co = 0
+    if sys.platform == "win32":
+        co = subprocess.DETACHED_PROCESS | subprocess.CREATE_NEW_PROCESS_GROUP
+    subprocess.Popen(lenh, close_fds=True, creationflags=co)
 
 
 def thu_muc_goi_rieng() -> Path:
