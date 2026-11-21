@@ -18,3 +18,11 @@ chu_ocr/
 .cache/
 *.pdf
 !docs/*.pdf
+
+# Kết quả đọc giấy chứng nhận / so sánh OCR (chứa dữ liệu cá nhân)
+*.gcn.json
+*.gcn.html
+*.ocr.json
+*.ocr.html
+*.dap_an.json
+*.sqlite

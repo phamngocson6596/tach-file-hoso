@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/phamngocson6596/tach-file-hoso/so_do/schema_gcn.json",
+  "title": "Giấy chứng nhận quyền sử dụng đất đã đọc (bản thử)",
+  "description": "Cấu trúc dùng chung giữa tach-file-hoso (Python) và eNotary Desk (.NET). Đổi cấu trúc thì tăng schema_version.",
+  "type": "object",
+  "required": ["schema_version", "loai_giay", "chuan_hoa", "kiem_tra", "chua_phan_loai", "nguyen_van"],
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "loai_giay": { "const": "giay_chung_nhan" },
+    "tep": {
+      "type": "object",
+      "properties": {
+        "ten": { "type": "string" }, "sha256": { "type": "string" }, "so_trang": { "type": "integer" },
+        "engine": { "type": "string" }, "ngay_doc": { "type": "string" }, "tu_dien_phien_ban": { "type": "integer" }
+      }
+    },
+    "chuan_hoa": {
+      "type": "object",
+      "description": "Lớp 2: trường app dùng. Trường không có trên giấy thì vắng mặt. Mọi thứ có thể nhiều đều là danh sách.",
+      "properties": {
+        "giay": {
+          "type": "object",
+          "properties": {
+            "so_phat_hanh": { "$ref": "#/$defs/gia_tri" }, "so_vao_so": { "$ref": "#/$defs/gia_tri" },
+            "ngay_cap": { "$ref": "#/$defs/gia_tri", "description": "gia_tri dạng YYYY-MM-DD, hoặc null nếu đọc không ra" },
+            "noi_cap": { "$ref": "#/$defs/gia_tri" }, "co_quan_cap": { "$ref": "#/$defs/gia_tri" },
+            "nguoi_ky": { "$ref": "#/$defs/gia_tri" }, "so_bien_nhan": { "$ref": "#/$defs/gia_tri" },
+            "ma_vach": { "$ref": "#/$defs/gia_tri" }, "so_ma_vach_in": { "$ref": "#/$defs/gia_tri" }
+          },
+          "additionalProperties": { "$ref": "#/$defs/gia_tri" }
+        },
+        "chu": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "vai": { "type": ["string", "null"], "description": "Nhãn in trên giấy: Ông, Bà, Hộ ông…" },
+              "ho_ten": { "$ref": "#/$defs/gia_tri" }, "nam_sinh": { "$ref": "#/$defs/gia_tri" },
+              "ngay_sinh": { "$ref": "#/$defs/gia_tri" }, "dia_chi": { "$ref": "#/$defs/gia_tri" },
+              "giay_to": { "$ref": "#/$defs/gia_tri", "description": "gia_tri = {loai, so}" }
+            }
+          }
+        },
+        "thua": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "so_thua": { "$ref": "#/$defs/gia_tri" }, "to_ban_do": { "$ref": "#/$defs/gia_tri" },
+              "dia_chi": { "$ref": "#/$defs/gia_tri" },
+              "dien_tich": { "$ref": "#/$defs/gia_tri", "description": "gia_tri: số; thêm bang_chu, so_tu_chu khi giấy ghi bằng chữ" },
+              "hinh_thuc_su_dung": { "$ref": "#/$defs/gia_tri" }, "thoi_han": { "$ref": "#/$defs/gia_tri" },
+              "nguon_goc": { "$ref": "#/$defs/gia_tri" },
+              "muc_dich": {
+                "type": "array",
+                "items": { "type": "object", "properties": {
+                  "loai": { "$ref": "#/$defs/gia_tri" }, "dien_tich": { "$ref": "#/$defs/gia_tri" } } }
+              }
+            }
+          }
+        },
+        "nha_o": { "type": "array", "items": { "type": "object", "additionalProperties": { "$ref": "#/$defs/gia_tri" } } },
+        "cong_trinh": { "type": "array", "items": { "type": "object", "additionalProperties": { "$ref": "#/$defs/gia_tri" } } },
+        "rung": { "$ref": "#/$defs/gia_tri" },
+        "cay_lau_nam": { "$ref": "#/$defs/gia_tri" },
+        "ghi_chu": { "type": "array", "items": { "$ref": "#/$defs/gia_tri" } },
+        "bien_dong": {
+          "type": "object",
+          "properties": {
+            "co_noi_dung": { "type": "boolean" },
+            "dong_tho": { "type": "array", "items": { "type": "string" } },
+            "trang_thai": { "$ref": "#/$defs/trang_thai" }, "ghi_chu": { "type": "string" }
+          }
+        }
+      }
+    },
+    "kiem_tra": {
+      "type": "array",
+      "items": { "type": "object", "required": ["ma", "muc_do", "noi_dung"], "properties": {
+        "ma": { "type": "string" }, "muc_do": { "enum": ["loi", "canh_bao"] }, "noi_dung": { "type": "string" } } }
+    },
+    "chua_phan_loai": {
+      "type": "array",
+      "description": "Nhãn đọc được nhưng chưa có trong từ điển: giữ lại, không bỏ.",
+      "items": { "type": "object", "properties": {
+        "muc": { "type": "string" }, "tieu_de_muc": { "type": "string" }, "nhan": { "type": ["string", "null"] },
+        "gia_tri": { "type": "string" }, "nguon": { "$ref": "#/$defs/nguon" } } }
+    },
+    "nguyen_van": {
+      "type": "array",
+      "description": "Lớp 1: khung giấy đúng như in. ma: I, II, II.1… ; DAU (trước mục I), KY (khối ký), BD (biến động), ?n (tiêu đề mất số).",
+      "items": {
+        "type": "object",
+        "properties": {
+          "ma": { "type": "string" }, "tieu_de": { "type": "string" }, "trang": { "type": "integer" },
+          "noi_dung": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["kieu"],
+              "properties": {
+                "kieu": { "enum": ["ban_ghi", "bang", "van_ban", "so_phat_hanh", "so_ma_vach_in"] },
+                "tho": { "type": "string" },
+                "truong": { "type": "array", "items": { "type": "object", "properties": {
+                  "nhan": { "type": ["string", "null"] }, "gia_tri": { "type": "string" } } } },
+                "dong_tho": { "type": "array", "items": { "type": "string" } },
+                "noi_dung": { "type": "string" }, "gia_tri": { "type": "string" },
+                "nguon": { "$ref": "#/$defs/nguon" }, "trang_thai": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "trang_thai": { "enum": ["doc_duoc", "can_xac_nhan", "da_xac_nhan"] },
+    "nguon": { "type": "object", "properties": {
+      "trang": { "type": "integer" }, "dong": { "type": "integer" }, "den_dong": { "type": "integer" } } },
+    "gia_tri": {
+      "type": "object",
+      "required": ["gia_tri", "nguyen_van", "trang_thai"],
+      "properties": {
+        "gia_tri": { "description": "Giá trị đã chuẩn hoá (số, chuỗi, ngày ISO, object) hoặc null" },
+        "nguyen_van": { "type": "string", "description": "Đúng như in trên giấy (theo OCR)" },
+        "nguon": { "$ref": "#/$defs/nguon" },
+        "trang_thai": { "$ref": "#/$defs/trang_thai" },
+        "ghi_chu": { "type": "string" }
+      }
+    }
+  }
+}

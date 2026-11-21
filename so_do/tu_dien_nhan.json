@@ -1,0 +1,209 @@
+{
+  "_ghi_chu": [
+    "Từ điển nối nhãn in trên giấy chứng nhận với tên trường chuẩn. Sửa file này không cần sửa code.",
+    "So khớp bỏ dấu, không phân biệt hoa thường, chịu được lỗi OCR nhẹ (ví dụ 'Số vio số cấp GON').",
+    "Nhãn kết thúc bằng * là so khớp phần đầu (tiêu đề mục dài, có nhiều biến thể).",
+    "Nhãn chưa có ở đây vẫn được giữ trong lớp nguyên văn và được đếm vào bảng 'nhãn mới' trong kho."
+  ],
+  "phien_ban": 1,
+  "muc": {
+    "nguoi": [
+      "Người sử dụng đất*",
+      "Chủ sở hữu*",
+      "Chủ sử dụng*",
+      "Tên người sử dụng đất*"
+    ],
+    "thua": [
+      "Thửa đất"
+    ],
+    "nha_o": [
+      "Nhà ở"
+    ],
+    "cong_trinh": [
+      "Công trình xây dựng khác",
+      "Công trình xây dựng",
+      "Tài sản khác gắn liền với đất"
+    ],
+    "rung": [
+      "Rừng sản xuất là rừng trồng"
+    ],
+    "cay_lau_nam": [
+      "Cây lâu năm"
+    ],
+    "ghi_chu": [
+      "Ghi chú"
+    ],
+    "so_do": [
+      "Sơ đồ thửa đất*"
+    ],
+    "bien_dong": [
+      "Những thay đổi sau khi cấp giấy chứng nhận*",
+      "Những thay đổi sau khi cấp giấy*"
+    ],
+    "khung_thua_nha": [
+      "Thửa đất, nhà ở*"
+    ]
+  },
+  "truong": {
+    "nguoi": {
+      "ho_ten": [
+        "Ông",
+        "Bà",
+        "Hộ ông",
+        "Hộ bà",
+        "Họ và tên",
+        "Họ tên",
+        "Chủ hộ",
+        "Hộ gia đình",
+        "Công ty",
+        "Tổ chức"
+      ],
+      "nam_sinh": [
+        "Năm sinh",
+        "Sinh năm"
+      ],
+      "ngay_sinh": [
+        "Ngày sinh",
+        "Sinh ngày"
+      ],
+      "giay_to": [
+        "CCCD số",
+        "CCCD",
+        "Căn cước công dân số",
+        "Căn cước số",
+        "Thẻ căn cước số",
+        "CMND số",
+        "CMND",
+        "Chứng minh nhân dân số",
+        "Hộ chiếu số",
+        "Số định danh cá nhân",
+        "Giấy chứng nhận đăng ký doanh nghiệp số",
+        "Mã số doanh nghiệp"
+      ],
+      "dia_chi": [
+        "Địa chỉ thường trú",
+        "Địa chỉ",
+        "Thường trú",
+        "Hộ khẩu thường trú",
+        "Nơi cư trú",
+        "Nơi thường trú",
+        "Trụ sở"
+      ]
+    },
+    "thua": {
+      "so_thua": [
+        "Thửa đất số",
+        "Số thửa",
+        "Thửa số"
+      ],
+      "to_ban_do": [
+        "Tờ bản đồ số",
+        "Tờ bản đồ",
+        "Số tờ bản đồ"
+      ],
+      "dia_chi": [
+        "Địa chỉ",
+        "Địa chỉ thửa đất",
+        "Địa chỉ thửa"
+      ],
+      "dien_tich": [
+        "Diện tích",
+        "Diện tích đất"
+      ],
+      "hinh_thuc_su_dung": [
+        "Hình thức sử dụng",
+        "Hình thức sử dụng đất"
+      ],
+      "muc_dich": [
+        "Mục đích sử dụng",
+        "Mục đích sử dụng đất",
+        "Mục đích"
+      ],
+      "thoi_han": [
+        "Thời hạn sử dụng",
+        "Thời hạn sử dụng đất",
+        "Thời hạn"
+      ],
+      "nguon_goc": [
+        "Nguồn gốc sử dụng",
+        "Nguồn gốc sử dụng đất",
+        "Nguồn gốc"
+      ]
+    },
+    "nha_o": {
+      "loai_nha": [
+        "Loại nhà ở",
+        "Loại nhà"
+      ],
+      "dia_chi": [
+        "Địa chỉ"
+      ],
+      "dien_tich_xay_dung": [
+        "Diện tích xây dựng"
+      ],
+      "dien_tich_san": [
+        "Diện tích sàn",
+        "Tổng diện tích sàn"
+      ],
+      "ket_cau": [
+        "Kết cấu",
+        "Kết cấu nhà"
+      ],
+      "so_tang": [
+        "Số tầng",
+        "Cấp (hạng)",
+        "Số tầng/Cấp"
+      ],
+      "cap": [
+        "Cấp nhà ở",
+        "Cấp hạng",
+        "Cấp"
+      ],
+      "hinh_thuc_so_huu": [
+        "Hình thức sở hữu"
+      ],
+      "thoi_han_so_huu": [
+        "Thời hạn sở hữu"
+      ],
+      "nam_hoan_thanh": [
+        "Năm hoàn thành xây dựng",
+        "Năm hoàn thành"
+      ]
+    },
+    "cong_trinh": {
+      "loai_cong_trinh": [
+        "Loại công trình"
+      ],
+      "hang_muc": [
+        "Hạng mục công trình",
+        "Hạng mục"
+      ],
+      "dien_tich_xay_dung": [
+        "Diện tích xây dựng"
+      ],
+      "dien_tich_san": [
+        "Diện tích sàn",
+        "Diện tích sàn hoặc công suất"
+      ],
+      "hinh_thuc_so_huu": [
+        "Hình thức sở hữu"
+      ],
+      "cap": [
+        "Cấp công trình",
+        "Cấp"
+      ],
+      "thoi_han_so_huu": [
+        "Thời hạn sở hữu"
+      ]
+    },
+    "giay": {
+      "so_vao_so": [
+        "Số vào sổ cấp GCN",
+        "Số vào sổ cấp giấy chứng nhận",
+        "Số vào sổ cấp giấy",
+        "Vào sổ cấp GCN số",
+        "Số vào sổ"
+      ]
+    }
+  }
+}
