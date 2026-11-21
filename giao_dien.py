@@ -245,16 +245,25 @@ class UngDung(tk.Tk):
         ttk.Label(f, text="Tên tổ chức:").grid(row=7, column=0, sticky="w", pady=2)
         w = ttk.Entry(f, textvariable=self.v["ten_to_chuc"])
         w.grid(row=7, column=1, columnspan=2, sticky="ew", padx=4, pady=2)
-        GoiY(w, "Tên tổ chức hành nghề công chứng của đơn vị, vd: Văn phòng công chứng Hòa An. "
-                "Lời chứng ghi đúng tên này: văn bản của đơn vị. Ghi tên văn phòng/phòng công chứng khác: bản sao "
-                "trong hồ sơ. Để trống nếu không dùng.")
+        GoiY(w, "Tên tổ chức hành nghề công chứng của đơn vị, vd: Văn phòng công chứng Hòa An. Ghi thêm tỉnh/thành "
+                "hay địa chỉ cũng được: công cụ tự bỏ đi, chỉ giữ phần tên riêng (xem dòng bên dưới). "
+                "Lời chứng ghi đúng tên này: văn bản của đơn vị. Ghi rõ tên văn phòng/phòng công chứng khác: bản sao "
+                "trong hồ sơ. Không đọc được tên nào thì không cộng không trừ. Để trống nếu không dùng.")
+        self.lb_to_chuc = ttk.Label(f, text="", style="Goiy.TLabel")
+        self.lb_to_chuc.grid(row=8, column=1, columnspan=2, sticky="w", padx=4)
 
-        ttk.Separator(f).grid(row=8, column=0, columnspan=3, sticky="ew", pady=6)
+        def xem_truoc_to_chuc(*_):
+            loi = self.tvb.loi_ten_to_chuc(self.v["ten_to_chuc"].get())
+            self.lb_to_chuc.configure(text=f"Sẽ tìm trong lời chứng tên: «{loi}»" if loi else "")
+        self.v["ten_to_chuc"].trace_add("write", xem_truoc_to_chuc)
+        xem_truoc_to_chuc()
+
+        ttk.Separator(f).grid(row=9, column=0, columnspan=3, sticky="ew", pady=6)
         w = ttk.Checkbutton(f, text="Văn bản luôn có Quốc hiệu (bỏ tick nếu có loại văn bản không có Quốc hiệu)",
                             variable=self.v["can_quoc_hieu"])
-        w.grid(row=9, column=0, columnspan=3, sticky="w", pady=2)
-        w = ttk.Checkbutton(f, text="Giữ trang trắng nằm giữa văn bản (mặc định bỏ đi)", variable=self.v["giu_trang_trang"])
         w.grid(row=10, column=0, columnspan=3, sticky="w", pady=2)
+        w = ttk.Checkbutton(f, text="Giữ trang trắng nằm giữa văn bản (mặc định bỏ đi)", variable=self.v["giu_trang_trang"])
+        w.grid(row=11, column=0, columnspan=3, sticky="w", pady=2)
         GoiY(w, "Bật nếu cần giữ đúng số tờ như bản scan (vd scan 2 mặt có mặt sau trắng).")
 
     def _khung_ocr(self, cha):

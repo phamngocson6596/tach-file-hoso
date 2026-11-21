@@ -36,7 +36,7 @@ except ImportError:  # PyMuPDF bản cũ
     import fitz as pymupdf
 from PIL import Image
 
-PHIEN_BAN = "0.3.6"
+PHIEN_BAN = "0.3.7"
 
 # =====================================================================
 # 1. CHUẨN HOÁ CHỮ & TỪ KHOÁ
@@ -283,13 +283,42 @@ M_NGAY_SO = re.compile(r"\b(\d{1,2}) (\d{1,2}) ((?:19|20)\d{2})\b")
 TIEN_TO_TO_CHUC = ("VAN PHONG CONG CHUNG", "PHONG CONG CHUNG", "VPCC", "PCC")
 
 
+_DUOI_DIA_DANH = re.compile(r"\b(?:TAI|THANH PHO|TP|TINH|QUAN|HUYEN|THI XA|THI TRAN|PHUONG|XA|DIA CHI|SO \d+ DUONG)\b")
+
+
 def loi_ten_to_chuc(ten: str) -> str:
-    """'Văn phòng công chứng Hòa An' -> 'HOA AN' (phần riêng của tên)."""
-    b = bo_dau(ten or "")
+    """Phần riêng của tên tổ chức, bỏ tiền tố và phần địa danh/địa chỉ người dùng ghi thêm:
+    'Văn phòng công chứng Lê Hùng Anh, Thành phố Hồ Chí Minh' -> 'LE HUNG ANH';
+    'Phòng Công chứng số 1 tỉnh Bình Dương' -> 'SO 1'."""
+    b = bo_dau((ten or "").split(",")[0].split(";")[0].split("-")[0])
     for tt in TIEN_TO_TO_CHUC:
         if b.startswith(tt + " "):
-            return b[len(tt) + 1:].strip()
+            b = b[len(tt) + 1:].strip()
+            break
+    m = _DUOI_DIA_DANH.search(b)
+    if m and m.start() > 0:  # chỉ cắt khi còn lại phần tên phía trước
+        b = b[:m.start()].strip()
     return b
+
+
+M_SAU_CONG_CHUNG = re.compile(r"\bPH[O0]NG C[O0]NG CHUNG ((?:[A-Z0-9]+ ?){1,6})")
+
+
+def nhan_to_chuc(chu_lc: str, loi: str) -> int:
+    """So tên tổ chức ghi trong lời chứng với tên đơn vị: 1 = đúng đơn vị, -1 = chắc chắn tổ chức khác,
+    0 = không đọc được tên tổ chức nào (không cộng không trừ). Chịu lỗi OCR nhẹ."""
+    import difflib
+    if not loi:
+        return 0
+    so_tu = len(loi.split())
+    thay = [" ".join(m.group(1).split()[:so_tu]) for m in M_SAU_CONG_CHUNG.finditer(chu_lc)]
+    thay = [x for x in thay if x]
+    if not thay:
+        return 0
+    if any(difflib.SequenceMatcher(None, x, loi).ratio() >= 0.8 for x in thay):
+        return 1
+    # chỉ kết luận "tổ chức khác" khi tên đọc được khác hẳn (tránh trừ nhầm vì OCR đọc sai vài chữ)
+    return -1 if all(difflib.SequenceMatcher(None, x, loi).ratio() < 0.5 for x in thay) else 0
 
 
 def _chuan_so(x: str) -> str:
@@ -358,7 +387,6 @@ def mo_ta_doan(x: dict) -> str:
 
 
 NGAY_LECH_TOI_DA = 30   # văn bản có ngày công chứng cũ hơn văn bản mới nhất quá số ngày này -> nghi là bản sao trong hồ sơ
-M_TO_CHUC_BAT_KY = mau("PHONG CONG CHUNG")
 
 
 def _ngay_so(ngay) -> int:
@@ -373,7 +401,7 @@ def cham_diem_doan(doan: list[dict], info: list[dict], trang: list[dict], rel: s
     nhieu = not cfg.get("mot_van_ban", True)
     so_ten = so_trong_ten(rel) if cfg.get("so_cc_trong_ten") else set()
     loi = loi_ten_to_chuc(cfg.get("ten_to_chuc", ""))
-    m_tc = mau("CONG CHUNG " + loi) if len(loi) >= 2 else None
+    loi = loi if len(loi) >= 2 else ""
     ngay_ds = [x["ngay"] for x in info if x["ngay"]]
     ngay_max = max(ngay_ds) if cfg.get("uu_tien_ngay_moi", True) and len(set(ngay_ds)) > 1 else None
     # "khối" văn bản liền nhau (giữa chúng không có trang hồ sơ) — dùng cho vị trí đầu/cuối ở chế độ nhiều văn bản
@@ -396,11 +424,11 @@ def cham_diem_doan(doan: list[dict], info: list[dict], trang: list[dict], rel: s
                 s += 6; ly.append(f"số CC {khop} khớp tên file")
             else:
                 s -= 6; ly.append(f"số CC {min(x['so_cc'])} không có trong tên file")
-        if m_tc:
-            if m_tc.search(x["chu"]):
-                s += 3; ly.append("lời chứng đúng tên tổ chức")
-            elif M_TO_CHUC_BAT_KY.search(x["chu"]):
-                s -= 3; ly.append("lời chứng ghi tổ chức khác")
+        tc = nhan_to_chuc(x["chu"], loi)
+        if tc > 0:
+            s += 3; ly.append("lời chứng đúng tên tổ chức")
+        elif tc < 0:
+            s -= 3; ly.append("lời chứng ghi tổ chức khác")
         if ngay_max and x["ngay"]:
             lech = _ngay_so(ngay_max) - _ngay_so(x["ngay"])
             if lech <= NGAY_LECH_TOI_DA:

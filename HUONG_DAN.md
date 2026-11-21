@@ -101,7 +101,7 @@ Cấu hình được lưu tự động cho lần mở sau. Chạy lại cùng th
 | Dấu hiệu | Văn bản của đơn vị | Bản sao trong hồ sơ |
 |---|---|---|
 | **Số công chứng có trong tên file/thư mục** (ví dụ `2022/1234.pdf`, `1234_1235.pdf`) | số trong lời chứng khớp với tên file: **+6** | đọc được số nhưng không khớp: **−6** |
-| **Tên tổ chức** (ví dụ *Văn phòng công chứng Hòa An*) | lời chứng ghi đúng tên: **+3** | lời chứng ghi tên văn phòng hoặc phòng công chứng khác: **−3** |
+| **Tên tổ chức** (ví dụ *Văn phòng công chứng Hòa An*; ghi thêm tỉnh/thành hay địa chỉ cũng được, công cụ tự bỏ đi, dòng xem trước dưới ô cho biết tên sẽ được tìm) | lời chứng ghi đúng tên (chịu được OCR sai vài chữ): **+3** | lời chứng ghi rõ tên văn phòng hoặc phòng công chứng khác hẳn: **−3**. Không đọc được tên tổ chức nào thì không cộng không trừ |
 | **Ngày công chứng mới nhất** (mặc định bật) | cùng ngày hoặc gần ngày (không quá 30 ngày) với văn bản mới nhất trong file: **+2** | cũ hơn quá 30 ngày: **−2** |
 | **Văn bản nằm ở: Đầu / Cuối file** | xem giải thích dưới bảng | xem giải thích dưới bảng |
 
