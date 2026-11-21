@@ -52,6 +52,7 @@ Write-Host "Tesseract: $TesseractDir"
 if (Test-Path "dist\TachVanBan") { Remove-Item "dist\TachVanBan" -Recurse -Force }
 python -m PyInstaller --noconfirm --clean --windowed --name TachVanBan `
     --paths . --hidden-import tach_van_ban --hidden-import tao_du_lieu_thu `
+    --hidden-import locro --collect-submodules locro --exclude-module locro.cli --exclude-module typer `
     --exclude-module numpy --exclude-module onnxruntime --exclude-module pymupdf.layout --exclude-module pymupdf4llm `
     --distpath dist --workpath build giao_dien.py
 if ($LASTEXITCODE -ne 0) { throw "PyInstaller lỗi" }

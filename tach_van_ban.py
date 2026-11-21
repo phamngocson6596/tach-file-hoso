@@ -36,7 +36,7 @@ except ImportError:  # PyMuPDF bản cũ
     import fitz as pymupdf
 from PIL import Image
 
-PHIEN_BAN = "0.3.5"
+PHIEN_BAN = "0.3.6"
 
 # =====================================================================
 # 1. CHUẨN HOÁ CHỮ & TỪ KHOÁ
@@ -470,8 +470,8 @@ def ocr_anh(img: Image.Image, cfg: dict):
     if cfg["engine"] == "screenai":
         global _SCREEN_AI
         if _SCREEN_AI is None:
-            from locro import ScreenAI  # pip install từ github.com/sergiocorreia/clv-locro
-            _SCREEN_AI = ScreenAI()
+            from locro import ScreenAI  # đóng gói kèm bản cài; mã nguồn: pip install git+…/clv-locro
+            _SCREEN_AI = ScreenAI()  # tìm Screen AI trong Chrome, không có thì dùng bản đã sao lưu
         return _SCREEN_AI.ocr_pil_image(img.convert("RGB")).text, None
     import pytesseract
     if cfg.get("tesseract"):
@@ -1423,14 +1423,71 @@ def tai_goi_tieng_viet(log=print, url: str = URL_GOI_VIE) -> Path:
     return f_vie
 
 
+# ---------- Screen AI của Chrome (thử nghiệm) — chỉ dùng bản Chrome trên máy đã tải, không tự tải từ Google ----------
+HUONG_DAN_SCREEN_AI = (
+    "Chrome trên máy chưa tải Screen AI. Cách để Chrome tải:\n"
+    "1. Mở Chrome, kéo một file PDF scan bất kỳ vào cửa sổ Chrome và chờ khoảng 1 phút "
+    "(Chrome tự tải bộ nhận dạng chữ khi gặp PDF scan).\n"
+    "2. Hoặc vào địa chỉ chrome://components, tìm mục 'Screen AI' và bấm 'Check for update'.\n"
+    "3. Sau đó bấm 'Kích hoạt Screen AI' lần nữa.")
+
+
+def trang_thai_screen_ai() -> tuple[str, str]:
+    """('chua_co_thu_vien' | 'chua_co_mo_hinh' | 'san_sang', thông báo)."""
+    try:
+        from locro import _download
+    except ImportError:
+        return "chua_co_thu_vien", ("Bản đang chạy chưa có thư viện locro cho Screen AI "
+                                    "(chạy từ mã nguồn: pip install git+https://github.com/sergiocorreia/clv-locro).")
+    chrome, rieng = _download._find_chrome_component_dir(), _download.find_local_model_dir()
+    if chrome or rieng:
+        noi = "trong Chrome" if chrome else "bản đã sao lưu"
+        return "san_sang", f"Screen AI {(chrome or rieng).name} ({noi}) · thử nghiệm, chạy tuần tự từng file."
+    return "chua_co_mo_hinh", "Chrome trên máy chưa tải Screen AI. Bấm 'Kích hoạt Screen AI' để xem cách lấy."
+
+
+def kich_hoat_screen_ai() -> str:
+    """Sao lưu Screen AI từ Chrome sang thư mục riêng (phòng Chrome cập nhật/xoá), rồi chạy thử nhận dạng 1 ảnh.
+    Ném FileNotFoundError nếu Chrome chưa có Screen AI. Không tải gì từ Internet."""
+    from locro import ScreenAI, _download
+    if _download._find_chrome_component_dir():
+        thu_muc = _download.copy_from_chrome()
+    else:
+        thu_muc = _download.find_local_model_dir()
+        if thu_muc is None:
+            raise FileNotFoundError(HUONG_DAN_SCREEN_AI)
+    from PIL import ImageDraw, ImageFont
+    anh = Image.new("RGB", (900, 160), "white")
+    ve = ImageDraw.Draw(anh)
+    chu = "LỜI CHỨNG CỦA CÔNG CHỨNG VIÊN"
+    for ten in ("arialbd.ttf", "timesbd.ttf", "DejaVuSans-Bold.ttf", "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"):
+        try:
+            ve.text((30, 50), chu, font=ImageFont.truetype(ten, 44), fill="black")
+            break
+        except OSError:
+            continue
+    else:
+        ve.text((30, 50), chu, fill="black")
+    ai = ScreenAI(thu_muc)
+    doc_duoc = ai.ocr_pil_image(anh).text.strip()
+    return f"Screen AI {thu_muc.name} hoạt động. Thử đọc ảnh mẫu: “{doc_duoc}”"
+
+
+def tim_chrome() -> str | None:
+    if sys.platform != "win32":
+        return shutil.which("google-chrome") or shutil.which("chromium")
+    for goc in (os.environ.get("PROGRAMFILES"), os.environ.get("PROGRAMFILES(X86)"), os.environ.get("LOCALAPPDATA")):
+        if goc and (Path(goc) / "Google" / "Chrome" / "Application" / "chrome.exe").exists():
+            return str(Path(goc) / "Google" / "Chrome" / "Application" / "chrome.exe")
+    return None
+
+
 def kiem_tra_ocr(cfg: dict) -> tuple[bool, str]:
     """Kiểm tra engine OCR dùng được chưa. Trả về (được/không, thông báo).
     Nếu Tesseract thiếu gói tiếng Việt nhưng đã tải gói riêng thì ghi cfg['tessdata'] để dùng gói đó."""
     if cfg["engine"] == "screenai":
-        import importlib.util
-        if importlib.util.find_spec("locro"):
-            return True, "Đã có thư viện locro (Screen AI của Chrome)."
-        return False, "Chưa cài thư viện locro cho Screen AI (xem HUONG_DAN.md mục 7)."
+        tt, tb = trang_thai_screen_ai()
+        return tt == "san_sang", tb
     try:
         import pytesseract
     except ImportError:
