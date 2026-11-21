@@ -270,18 +270,20 @@ Muốn thêm loại giấy tờ thì sửa các danh sách `TIEU_DE_VAN_BAN`, `T
 
 ---
 
-## 6. (Tuỳ chọn) Dùng engine OCR của Chrome
+## 6. (Thử nghiệm) Dùng Screen AI của Chrome
 
-Cần các điều kiện sau:
+Screen AI là bộ nhận dạng chữ mà Chrome dùng để đọc PDF scan. Bản cài đã có sẵn thư viện để gọi nó, nhưng **không kèm Screen AI**, vì đây là phần mềm mã đóng của Google. Công cụ chỉ dùng bản mà Chrome trên máy bạn đã tự tải về.
 
-- Python 3.12 trở lên.
-- Chrome đã tải thành phần Screen AI: vào `chrome://components`, tìm *Screen AI*, bấm *Check for update*.
-- Cài thư viện bằng lệnh `pip install git+https://github.com/sergiocorreia/clv-locro`.
+1. Ở mục **3. Đọc chữ**, chọn công cụ **Screen AI của Chrome (thử nghiệm)**, rồi bấm **Kích hoạt Screen AI**.
+2. Nếu Chrome chưa tải Screen AI, phần mềm hướng dẫn cách để Chrome tải (và đề nghị mở Chrome giúp):
+   - kéo một file PDF scan vào Chrome và chờ khoảng 1 phút; **hoặc**
+   - vào `chrome://components`, tìm mục *Screen AI*, bấm *Check for update*.
 
-Sau đó chọn **Screen AI của Chrome** trong giao diện. Chế độ này chạy tuần tự từng file và **chưa được kiểm thử đầy đủ**.
+   Sau đó bấm **Kích hoạt Screen AI** lần nữa.
+3. Khi kích hoạt, phần mềm sao lưu Screen AI sang thư mục riêng (`%LOCALAPPDATA%\locro`), để vẫn dùng được nếu Chrome cập nhật hay xoá nó. Sau đó phần mềm chạy thử đọc một ảnh mẫu và báo kết quả.
 
-Thư viện này là mã đóng của Google:
-
-- có thể ngừng chạy sau một bản cập nhật Chrome;
-- việc dùng nó ngoài Chrome chưa rõ về mặt giấy phép;
-- công cụ **không đóng gói kèm** thư viện này.
+Lưu ý:
+- Chế độ này chạy tuần tự từng file (không chạy song song).
+- Chế độ này **chưa được kiểm thử trên hồ sơ thật**. Nên chạy thử vài chục file và so với Tesseract trước khi dùng rộng.
+- Screen AI có thể ngừng chạy sau một bản cập nhật Chrome. Việc dùng nó ngoài Chrome chưa rõ về mặt điều khoản của Google.
+- Chạy từ mã nguồn thì cài thêm thư viện: `pip install git+https://github.com/sergiocorreia/clv-locro`.

@@ -86,6 +86,7 @@ class UngDung(tk.Tk):
         self._bien()
         self._dung_giao_dien()
         self._nap_cau_hinh()
+        self._doi_nut_ocr()
         self.after(100, self._doc_hang_doi)
         self.after(300, self.kiem_tra_ocr)
         self.after(1500, lambda: self.v["kiem_tra_cap_nhat"].get() and self.kiem_tra_cap_nhat(tu_dong=True))
@@ -265,7 +266,7 @@ class UngDung(tk.Tk):
         ttk.Label(r, text="Công cụ:").pack(side="left")
         cb = ttk.Combobox(r, textvariable=self.v["engine"], values=list(ENGINE), state="readonly", width=30)
         cb.pack(side="left", padx=(4, 14))
-        cb.bind("<<ComboboxSelected>>", lambda e: self.kiem_tra_ocr())
+        cb.bind("<<ComboboxSelected>>", lambda e: (self._doi_nut_ocr(), self.kiem_tra_ocr()))
         ttk.Label(r, text="Độ nét:").pack(side="left")
         w = ttk.Combobox(r, textvariable=self.v["dpi"], values=["150", "200", "300"], state="readonly", width=5)
         w.pack(side="left", padx=(4, 2))
@@ -292,6 +293,11 @@ class UngDung(tk.Tk):
         w.pack(side="left", padx=(6, 0))
         GoiY(w, "Mở kho mô hình ngôn ngữ của Tesseract nếu máy không tải tự động được (vd mạng cơ quan chặn). "
                 "Tải vie.traineddata rồi chép vào:\n" + str(self.tvb.thu_muc_goi_rieng()))
+        self.nut_screen_ai = ttk.Button(r, text="Kích hoạt Screen AI", command=self.kich_hoat_screen_ai)
+        GoiY(self.nut_screen_ai, "Dùng bộ nhận dạng chữ Screen AI mà Chrome trên máy đã tải về (không tải gì từ "
+                                 "Internet): sao lưu sang thư mục riêng rồi chạy thử. Tính năng thử nghiệm; Screen AI "
+                                 "là phần mềm mã đóng của Google.")
+        self._nut_tesseract = [x for x in r.winfo_children() if x is not self.nut_screen_ai][1:]
         self.lb_ocr = ttk.Label(f, text="", wraplength=520)
         self.lb_ocr.grid(row=3, column=0, columnspan=3, sticky="w", pady=(4, 0))
         ttk.Checkbutton(f, text="OCR lại cả trang đã có sẵn lớp chữ (khi lớp chữ do máy scan tạo bị sai)",
@@ -456,6 +462,43 @@ class UngDung(tk.Tk):
             mau_ten_vb=v["mau_ten_vb"].get().strip() or "{ten}", mau_ten_hs=v["mau_ten_hs"].get().strip() or "{ten}",
         )
         return cfg
+
+    def _doi_nut_ocr(self):
+        """Hiện nút theo công cụ đang chọn: Tesseract (tải Tesseract, gói tiếng Việt) hoặc Screen AI (kích hoạt)."""
+        la_sai = ENGINE.get(self.v["engine"].get()) == "screenai"
+        for w in self._nut_tesseract:
+            w.pack_forget()
+        self.nut_screen_ai.pack_forget()
+        if la_sai:
+            self.nut_screen_ai.pack(side="left", padx=(6, 0))
+        else:
+            for w in self._nut_tesseract:
+                w.pack(side="left", padx=(6, 0))
+
+    def kich_hoat_screen_ai(self):
+        tt, tb = self.tvb.trang_thai_screen_ai()
+        if tt == "chua_co_thu_vien":
+            messagebox.showinfo("Screen AI", tb)
+            return
+        if tt == "chua_co_mo_hinh":
+            chrome = self.tvb.tim_chrome()
+            if chrome and messagebox.askyesno("Screen AI", self.tvb.HUONG_DAN_SCREEN_AI + "\n\nMở Chrome ngay?"):
+                import subprocess
+                subprocess.Popen([chrome, "chrome://components"])
+            elif not chrome:
+                messagebox.showinfo("Screen AI", "Máy chưa cài Google Chrome. Screen AI chỉ dùng được khi có Chrome; "
+                                                 "hãy dùng Tesseract.")
+            return
+        self.nut_screen_ai.configure(state="disabled")
+        self.lb_ocr.configure(text="Đang kích hoạt và chạy thử Screen AI…", foreground="#374151")
+
+        def chay():
+            try:
+                self.q.put(("screen_ai", (True, self.tvb.kich_hoat_screen_ai())))
+            except Exception as e:
+                self.q.put(("screen_ai", (False, f"{type(e).__name__}: {e}")))
+
+        threading.Thread(target=chay, daemon=True).start()
 
     def kiem_tra_ocr(self):
         ok, tb = self.tvb.kiem_tra_ocr(self._cfg())
@@ -664,6 +707,11 @@ class UngDung(tk.Tk):
                                                f"Có thể xem trực tiếp tại {self.tvb.URL_KHO}/releases")
                     elif not tu_dong:
                         messagebox.showinfo("Bản mới nhất", f"Bạn đang dùng bản mới nhất ({self.tvb.PHIEN_BAN}).")
+                elif loai == "screen_ai":
+                    ok, tb = gt
+                    self.nut_screen_ai.configure(state="normal")
+                    (messagebox.showinfo if ok else messagebox.showerror)("Screen AI", tb)
+                    self.kiem_tra_ocr()
                 elif loai == "cap_nhat_tien_do":
                     da, tong = gt
                     self.lb_moi_phu.configure(text=f"Đang tải bộ cài… {da / 1048576:.1f}"
@@ -750,6 +798,10 @@ def tu_kiem_tra(thu_muc: str) -> int:
         nhat_ky.append(f"OCR: {tb}")
         if not ok:
             raise RuntimeError(tb)
+        tt_sai, tb_sai = tvb.trang_thai_screen_ai()
+        nhat_ky.append(f"Screen AI: {tt_sai} · {tb_sai}")
+        if getattr(sys, "frozen", False) and tt_sai == "chua_co_thu_vien":
+            raise RuntimeError("bản đóng gói thiếu thư viện locro")
         kq = tvb.chay_tach(goc / "scan", goc / "ket_qua", cfg, so_luong=2, log=nhat_ky.append)
         tt = {r["duong_dan"][0]: r["trang_thai"] for r in kq}
         nghi_trang = {r["duong_dan"][0] for r in kq if r.get("nghi_thieu_trang")}
