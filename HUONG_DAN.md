@@ -184,9 +184,9 @@ Với mỗi văn bản đã tách, công cụ tự kiểm tra số trang. Kết 
 | Cách kiểm tra | Ví dụ cảnh báo | Độ tin cậy |
 |---|---|---|
 | So với câu *"…mỗi bản chính gồm 02 tờ, 05 trang"* trong lời chứng. Nhận cả "bao gồm", "gồm có" và số viết bằng chữ ("hai mươi mốt trang") | lời chứng ghi 5 trang nhưng chỉ tách được 4 trang (thiếu 1) | Cao. Khi khớp, bảng ghi *"đủ 5/5 trang theo lời chứng"* |
-| Số trang in trên trang ("1", "- 2 -", "Trang 3/5") | số trang in nhảy từ 2 (tr.4) sang 4 (tr.5): thiếu trang 3 | Thấp. OCR hay bỏ sót con số nhỏ đứng riêng ở lề, nên chỉ đọc được ở một số trang |
-| Số Điều nhảy cóc giữa hai trang liền nhau | Điều nhảy từ 2 (tr.1) sang 7 (tr.2) | Trung bình. Chỉ ra **vị trí** trang bị mất, nhưng có thể báo nhầm khi OCR đọc sót tiêu đề Điều |
-| Trang bị scan 2 lần liền nhau. So chữ với trang nhiều chữ, so hình ảnh với trang ít chữ như trang ký | tr.3 trùng tr.2 (scan 2 lần), đã bỏ khỏi văn bản | Cao. **Tự bỏ trang trùng** ra khỏi file văn bản; file vẫn được đưa vào nhóm cần kiểm tra để bạn liếc lại |
+| Số trang in trên trang ("1", "- 2 -", "Trang 3/5") | lưu ý số trang (chưa chắc): số trang in nhảy từ 2 (tr.4) sang 4 (tr.5) | Thấp. **Chỉ ghi chú** ở cột `thong_tin`, không đưa file vào nhóm cần kiểm tra |
+| Số Điều nhảy cóc giữa hai trang liền nhau | lưu ý số trang (chưa chắc): Điều nhảy từ 2 (tr.1) sang 7 (tr.2) | Trung bình. **Chỉ ghi chú**, vì OCR có thể đọc sót tiêu đề Điều |
+| Trang bị scan 2 lần liền nhau. So chữ với trang nhiều chữ, so hình ảnh với trang ít chữ như trang ký | tr.3 trùng tr.2 (scan 2 lần), đã bỏ khỏi văn bản | Cao. **Chỉ tự bỏ khi chắc chắn**: hai trang gần như y hệt về hình ảnh, *hoặc* bỏ đi thì số trang khớp đúng với lời chứng. Không chắc thì chỉ cảnh báo "nghi scan trùng, chưa bỏ". Cả hai trường hợp đều đưa file vào nhóm cần kiểm tra |
 | Hai trang không liền nhau trong văn bản giống hệt | tr.2 và tr.5 gần như giống hệt (scan trùng?) | Chỉ cảnh báo, không tự bỏ |
 
 Khi lời chứng ghi số trang **khớp** với số trang tách được, công cụ bỏ qua các dấu hiệu yếu (số trang in, số Điều), vì khi đó văn bản không thể thiếu trang.

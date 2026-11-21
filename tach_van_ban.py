@@ -673,9 +673,17 @@ def _giong_het(a: dict, b: dict) -> bool:
     return True
 
 
-def tim_trang_trung(doc: list[dict], trang: list[dict]) -> dict[int, int]:
+LECH_ANH_CHAC_CHAN = 4   # mã ảnh lệch ≤ 4/256 bit: gần như cùng một bản scan -> tự bỏ ngay
+
+
+def _chac_trung(a: dict, b: dict) -> bool:
+    ha, hb = a.get("ma_anh"), b.get("ma_anh")
+    return bool(ha and hb) and bin(int(ha, 16) ^ int(hb, 16)).count("1") <= LECH_ANH_CHAC_CHAN
+
+
+def tim_trang_trung(doc: list[dict], trang: list[dict]) -> dict[int, tuple[int, bool]]:
     """Trang bị scan 2 lần liền nhau (bỏ qua trang trắng ở giữa), chỉ xét trang thuộc văn bản (không xét giấy tờ
-    hồ sơ: hai bản CCCD giống bố cục là chuyện bình thường). Trả {trang lặp: trang gốc}."""
+    hồ sơ: hai bản CCCD giống bố cục là chuyện bình thường). Trả {trang lặp: (trang gốc, chắc chắn?)}."""
     trung, truoc = {}, None
     for i, t in enumerate(trang):
         if t["nhan"] == "TT":
@@ -684,19 +692,21 @@ def tim_trang_trung(doc: list[dict], trang: list[dict]) -> dict[int, int]:
             sa, sb = doc[truoc].get("so_in"), doc[i].get("so_in")
             khac = (sa and sb and sa != sb) or _cac_dieu(doc[truoc]["text"]) != _cac_dieu(doc[i]["text"])
             if not khac and _giong_het(doc[truoc], doc[i]):
-                trung[i] = trung.get(truoc, truoc)
+                goc = trung[truoc][0] if truoc in trung else truoc
+                trung[i] = (goc, _chac_trung(doc[goc], doc[i]))
                 continue  # giữ "truoc" là bản gốc nếu bị scan 3 lần
         truoc = i
     return trung
 
 
-def kiem_tra_trang(d: dict, trang: list[dict], doc: list[dict]) -> tuple[list[str], list[str]]:
-    """Trả về (các dấu hiệu nghi thiếu/thừa/trùng trang, các xác nhận đủ trang)."""
+def kiem_tra_trang(d: dict, trang: list[dict], doc: list[dict]) -> tuple[list[str], list[str], list[str]]:
+    """Trả về (dấu hiệu chắc chắn: số trang lệch lời chứng, trang trùng — đẩy file vào nhóm cần kiểm tra;
+    xác nhận đủ trang; lưu ý yếu: số trang in, số Điều nhảy cóc — chỉ ghi chú, vì OCR hay đọc sai số)."""
     ds = [i for i in sorted(d["trang"]) if trang[i]["nhan"] != "TT"]
     n = len(ds)
     nghi, dat = [], []
     if not ds:
-        return nghi, dat
+        return nghi, dat, []
 
     # 1. Số trang ghi trong lời chứng — dấu hiệu chắc nhất
     chu_lc = " ".join(bo_dau(doc[i]["text"]) for i in ds if trang[i]["nhan"] == "LC")
@@ -748,15 +758,14 @@ def kiem_tra_trang(d: dict, trang: list[dict], doc: list[dict]) -> tuple[list[st
             truoc_max, truoc_k = max(truoc_max or 0, max(so_dieu)), k
 
     # Lời chứng ghi số trang khớp đúng thì không thể thiếu: bỏ qua các dấu hiệu yếu (có thể do OCR đọc sai số)
-    if not khop_loi_chung:
-        nghi += nhay
+    luu_y = [] if khop_loi_chung else nhay
 
     # 4. Hai trang KHÔNG liền nhau trong văn bản giống hệt (trùng liền nhau đã được bỏ trước khi ghép trang)
     for x in range(n):
         for y in range(x + 2, n):
             if _giong_het(doc[ds[x]], doc[ds[y]]):
                 nghi.append(f"tr.{ds[x]+1} và tr.{ds[y]+1} gần như giống hệt (scan trùng?)")
-    return nghi, dat
+    return nghi, dat, luu_y
 
 
 def khoa_cache(p: Path, cfg) -> str:
@@ -911,8 +920,9 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
             f_cache.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
         trang = [phan_tich_trang(d["text"], d["muc"], cfg["nguong_trang"]) for d in doc]
         trung = tim_trang_trung(doc, trang)
-        for j, i in trung.items():  # trang scan lặp: coi như trang trắng khi ghép văn bản
-            trang[j].update(nhan="TT", trung=i, ly_do=f"trùng tr.{i+1} (scan 2 lần)")
+        for j, (i, chac) in trung.items():  # trùng chắc chắn: coi như trang trắng khi ghép văn bản
+            if chac:
+                trang[j].update(nhan="TT", trung=i, ly_do=f"trùng tr.{i+1} (scan 2 lần)")
         doan, cb_file = chia_van_ban(trang, cfg["can_quoc_hieu"])
         info = [thong_tin_doan(d, trang, [x["text"] for x in doc]) for d in doan]
         canh_bao, thong_tin = list(cb_file), []
@@ -960,13 +970,35 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
                                                        if trang[i]["nhan"] == "TT" and "trung" not in trang[i]})
         # kiểm tra thiếu / thừa / trùng trang trong từng văn bản đã tách
         trong_doan = {x for d in doan if d["trang"] for x in range(min(d["trang"]), max(d["trang"]) + 1)}
-        nghi_thieu = [f"tr.{j+1} trùng tr.{i+1} (scan 2 lần), đã bỏ khỏi văn bản"
-                      for j, i in sorted(trung.items()) if i in trong_doan or j in trong_doan]
+        nghi_thieu = [f"tr.{j+1} trùng tr.{i+1} (scan 2 lần, gần như y hệt), đã bỏ khỏi văn bản"
+                      for j, (i, chac) in sorted(trung.items()) if chac and (i in trong_doan or j in trong_doan)]
         for k, d in enumerate(doan):
             tien_to = f"VB{k+1}: " if len(doan) > 1 else ""
-            nghi, dat = kiem_tra_trang(d, trang, doc)
+            # trùng chưa chắc chắn: chỉ bỏ khi bỏ đi thì số trang khớp đúng với lời chứng; không thì chỉ cảnh báo
+            nghi_tr = [(j, i) for j, (i, chac) in sorted(trung.items()) if not chac and j in d["trang"] and i in d["trang"]]
+            if nghi_tr:
+                so_tr = so_trang_theo_loi_chung(" ".join(bo_dau(doc[x]["text"]) for x in d["trang"]
+                                                         if trang[x]["nhan"] == "LC"))[1]
+                n_vb = sum(trang[x]["nhan"] != "TT" for x in d["trang"])
+                if so_tr and n_vb - len(nghi_tr) == so_tr:
+                    for j, i in nghi_tr:
+                        d["trang"].remove(j)
+                        trang[j].update(nhan="TT", trung=i, ly_do=f"trùng tr.{i+1} (scan 2 lần)")
+                        nghi_thieu.append(f"{tien_to}tr.{j+1} trùng tr.{i+1} (scan 2 lần), đã bỏ khỏi văn bản "
+                                          f"(bỏ đi thì khớp {so_tr} trang theo lời chứng)")
+                else:
+                    nghi_thieu += [f"{tien_to}tr.{j+1} gần giống tr.{i+1} (nghi scan trùng), chưa bỏ — cần xem lại"
+                                   for j, i in nghi_tr]
+            nghi, dat, luu_y = kiem_tra_trang(d, trang, doc)
+            # trùng chưa chắc mà một bản nằm trong văn bản, bản kia ở ngoài (vd trang tiêu đề scan 2 lần, lệch nhau)
+            for j, (i, chac) in sorted(trung.items()):
+                if not chac and ((i in d["trang"]) != (j in d["trang"])):
+                    ngoai = j if i in d["trang"] else i
+                    nghi_thieu.append(f"{tien_to}tr.{j+1} gần giống tr.{i+1} (nghi scan trùng), "
+                                      f"tr.{ngoai+1} đang để ở phần hồ sơ — cần xem lại")
             nghi_thieu += [tien_to + x for x in nghi]
             thong_tin += [tien_to + x for x in dat]
+            thong_tin += [f"{tien_to}lưu ý số trang (chưa chắc): {x}" for x in luu_y]
         canh_bao += ["số trang: " + x for x in nghi_thieu]
         so_trang_trang = sum(t["nhan"] == "TT" and "trung" not in t for t in trang)
         if so_trang_trang:
