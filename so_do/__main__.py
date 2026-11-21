@@ -45,7 +45,13 @@ def main(argv=None):
 
     if a.lenh == "doc":
         for p in a.tep:
-            _doc_mot(p, a, kho)
+            try:
+                _doc_mot(p, a, kho)
+            except (RuntimeError, FileNotFoundError) as e:
+                print(f"  Không đọc được: {e}")
+                if a.engine == "screenai":
+                    print("  Gợi ý: kích hoạt Screen AI (HUONG_DAN.md mục 6) hoặc chạy thêm --engine tesseract")
+                    break
     elif a.lenh == "tim":
         kq = kho_mod.tim_nguoi(kho, a.nguoi) if a.nguoi else kho_mod.tim_thua(kho, a.thua, a.to) if a.thua else []
         print(json.dumps(kq, ensure_ascii=False, indent=1) if kq else "Không thấy.")
