@@ -76,6 +76,8 @@ def doc_ma_vach(doc) -> dict[int, list[str]]:
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")  # tránh lỗi in tiếng Việt khi chuyển hướng output trên Windows
     if len(sys.argv) < 2:
         sys.exit(__doc__)
     pdf = Path(sys.argv[1])
