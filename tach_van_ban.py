@@ -38,7 +38,7 @@ except ImportError:  # PyMuPDF bản cũ
     import fitz as pymupdf
 from PIL import Image
 
-PHIEN_BAN = "0.3.7"
+PHIEN_BAN = "0.3.8"
 
 # =====================================================================
 # 1. CHUẨN HOÁ CHỮ & TỪ KHOÁ
