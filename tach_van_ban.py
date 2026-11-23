@@ -27,7 +27,9 @@ import sys
 import time
 import traceback
 import unicodedata
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from collections import deque
+from multiprocessing.connection import wait as cho_ket_noi
+import subprocess
 from pathlib import Path
 
 try:
@@ -506,8 +508,13 @@ def ocr_anh(img: Image.Image, cfg: dict):
         pytesseract.pytesseract.tesseract_cmd = cfg["tesseract"]
     if cfg.get("tessdata"):
         os.environ["TESSDATA_PREFIX"] = cfg["tessdata"]
-    d = pytesseract.image_to_data(img, lang=cfg["lang"], config="--oem 1 --psm 3",
-                                  output_type=pytesseract.Output.DICT)
+    try:
+        d = pytesseract.image_to_data(img, lang=cfg["lang"], config="--oem 1 --psm 3",
+                                      output_type=pytesseract.Output.DICT, timeout=QUA_GIO_OCR_TRANG)
+    except RuntimeError as e:
+        if "timeout" in str(e).lower():
+            raise RuntimeError(f"Tesseract treo khi đọc một trang (quá {QUA_GIO_OCR_TRANG // 60} phút)") from None
+        raise
     w, h = img.size
     dong, tu, truoc, khoi_truoc = [], [], None, None
     cac_dong = []
@@ -1602,6 +1609,99 @@ def dem_trang_thai(kq: list[dict]) -> dict:
     return {k: sum(r["trang_thai"] == k for r in kq) for k in THU_TU}
 
 
+QUA_GIO_OCR_TRANG = 300          # một trang OCR quá 5 phút: coi như Tesseract bị treo
+QUA_GIO_FILE_CO_BAN = 15 * 60    # một file quá 15 phút + 3 phút/trang: coi như bị treo, bỏ qua để chạy tiếp
+QUA_GIO_FILE_MOI_TRANG = 3 * 60
+
+
+def _xu_ly_trong_tien_trinh_con(conn, duong_dan: str, rel: str, cfg: dict):
+    """Chạy 1 file trong tiến trình riêng: báo số trang trước (để tính hạn giờ), rồi gửi kết quả."""
+    if hasattr(os, "setsid"):
+        os.setsid()  # nhóm tiến trình riêng: khi dừng thì dừng được cả Tesseract nó gọi
+    try:
+        try:
+            with pymupdf.open(duong_dan) as d:
+                conn.send(("so_trang", d.page_count))
+        except Exception:
+            pass
+        conn.send(("ket_qua", xu_ly_file(duong_dan, rel, cfg)))
+    finally:
+        conn.close()
+
+
+def _giet_tien_trinh(pr) -> None:
+    """Dừng hẳn tiến trình con và cả Tesseract nó đang gọi (Windows không tự dừng tiến trình cháu)."""
+    if pr.is_alive() and os.name == "nt":
+        subprocess.run(["taskkill", "/F", "/T", "/PID", str(pr.pid)], capture_output=True,
+                       creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+    elif pr.is_alive() and hasattr(os, "killpg"):
+        try:
+            os.killpg(pr.pid, 9)
+        except OSError:
+            pass
+    if pr.is_alive():
+        pr.kill()
+    pr.join(5)
+
+
+def _ket_qua_loi(p: Path, rel: str, ly_do: str, thoi_gian: float, so_trang: int = 0) -> dict:
+    return dict(duong_dan=rel, goc=p.resolve().as_uri(), so_trang=so_trang, trang_van_ban="", trang_thai="LOI",
+                canh_bao=ly_do, nghi_thieu_trang="", so_cong_chung="", ngay_cong_chung="", loai_van_ban="",
+                file_van_ban="", thong_tin="", doi_ten=[], nhan_trang="", thoi_gian=round(thoi_gian, 1),
+                chi_tiet=[], anh=[], van_ban=[])
+
+
+def _chay_song_song(ds, cfg, so_luong, nhan, dung):
+    """Mỗi file một tiến trình riêng, tối đa so_luong cùng lúc. Nhờ vậy bấm Dừng là dừng ngay,
+    file bị treo quá giờ thì bỏ qua (ghi LOI) để chạy tiếp, tiến trình chết bất thường không kéo đổ cả đợt."""
+    ctx = multiprocessing.get_context("spawn")  # an toàn khi gọi từ giao diện (đa luồng), giống hệt trên Windows
+    cho = deque(ds)
+    dang = {}  # conn -> dict(pr, p, rel, t0, so_trang)
+    try:
+        while cho or dang:
+            if dung is not None and dung.is_set():
+                break
+            while cho and len(dang) < so_luong:
+                p, rel = cho.popleft()
+                doc_, ghi = ctx.Pipe(duplex=False)
+                pr = ctx.Process(target=_xu_ly_trong_tien_trinh_con, args=(ghi, str(p), rel, cfg), daemon=True)
+                pr.start()
+                ghi.close()
+                dang[doc_] = dict(pr=pr, p=p, rel=rel, t0=time.time(), so_trang=0)
+            for conn in cho_ket_noi(list(dang), timeout=1):
+                v = dang[conn]
+                try:
+                    loai, gia_tri = conn.recv()
+                except (EOFError, OSError):
+                    loai, gia_tri = "chet", None
+                if loai == "so_trang":
+                    v["so_trang"] = gia_tri
+                    continue
+                del dang[conn]
+                conn.close()
+                v["pr"].join(10)
+                if loai == "chet":
+                    ma = v["pr"].exitcode
+                    gia_tri = _ket_qua_loi(v["p"], v["rel"], f"tiến trình xử lý dừng bất thường (mã {ma}) — "
+                                           "có thể thiếu bộ nhớ: giảm số Song song rồi chạy lại",
+                                           time.time() - v["t0"], v["so_trang"])
+                nhan(gia_tri)
+            bay_gio = time.time()
+            for conn, v in list(dang.items()):
+                han = QUA_GIO_FILE_CO_BAN + QUA_GIO_FILE_MOI_TRANG * v["so_trang"]
+                if bay_gio - v["t0"] > han:
+                    del dang[conn]
+                    _giet_tien_trinh(v["pr"])
+                    conn.close()
+                    nhan(_ket_qua_loi(v["p"], v["rel"], f"quá {han // 60} phút vẫn chưa xong, đã bỏ qua để chạy tiếp "
+                                      "(file có thể bị hỏng, quá nặng, hoặc ổ mạng bị ngắt)",
+                                      bay_gio - v["t0"], v["so_trang"]))
+    finally:
+        for conn, v in dang.items():  # bấm Dừng: bỏ ngay các file đang xử lý dở
+            _giet_tien_trinh(v["pr"])
+            conn.close()
+
+
 def chay_tach(vao, ra, cfg: dict, so_luong: int = 1, gioi_han: int = 0,
               log=print, tien_do=None, dung=None) -> list[dict]:
     """Chạy toàn bộ. tien_do(k, tong, ket_qua_file) được gọi sau mỗi file; dung là threading.Event để dừng giữa chừng."""
@@ -1626,26 +1726,16 @@ def chay_tach(vao, ra, cfg: dict, so_luong: int = 1, gioi_han: int = 0,
         if tien_do:
             tien_do(len(kq), len(ds), r)
         vb = r["trang_van_ban"] or "—"
-        log(f"[{len(kq)}/{len(ds)}] {r['trang_thai']:<12} {vb:<14} {r['duong_dan']}  ({r['thoi_gian']}s)")
+        loi = f"  → {r['canh_bao']}" if r["trang_thai"] == "LOI" else ""
+        log(f"[{len(kq)}/{len(ds)}] {r['trang_thai']:<12} {vb:<14} {r['duong_dan']}  ({r['thoi_gian']}s){loi}")
 
-    if so_luong == 1:
+    if cfg["engine"] == "screenai":  # Screen AI nạp mô hình 1 lần, chạy tuần tự trong tiến trình này
         for p, rel in ds:
             if dung is not None and dung.is_set():
                 break
             nhan(xu_ly_file(str(p), rel, cfg))
     else:
-        # luôn dùng "spawn": an toàn khi gọi từ giao diện (đa luồng) và giống hệt cách chạy trên Windows
-        ex = ProcessPoolExecutor(max_workers=so_luong, mp_context=multiprocessing.get_context("spawn"))
-        try:
-            fut = [ex.submit(xu_ly_file, str(p), rel, cfg) for p, rel in ds]
-            for f in as_completed(fut):
-                nhan(f.result())
-                if dung is not None and dung.is_set():
-                    for x in fut:
-                        x.cancel()
-                    break
-        finally:
-            ex.shutdown(wait=True, cancel_futures=True)
+        _chay_song_song(ds, cfg, so_luong, nhan, dung)
 
     if len(kq) < len(ds):
         log(f"Đã dừng: xử lý xong {len(kq)}/{len(ds)} file; báo cáo dưới đây chỉ gồm các file này.")

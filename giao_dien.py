@@ -117,7 +117,7 @@ class UngDung(tk.Tk):
             giu_trang_trang=tk.BooleanVar(value=md["giu_trang_trang"]),
             engine=tk.StringVar(value="Tesseract (khuyên dùng)"),
             dpi=tk.StringVar(value=str(md["dpi"])),
-            so_luong=tk.StringVar(value=str(max(1, (os.cpu_count() or 2) - 1))),
+            so_luong=tk.StringVar(value=str(max(1, min(6, (os.cpu_count() or 2) // 2)))),  # quá nhiều thì tranh CPU, RAM
             tesseract=tk.StringVar(value=self.tvb.tim_tesseract() or ""),
             luon_ocr=tk.BooleanVar(value=False),
             xuat_ho_so=tk.BooleanVar(value=False),
@@ -639,7 +639,7 @@ class UngDung(tk.Tk):
         self.dung.set()
         self.nut_dung.configure(state="disabled")
         self.lb_tien_do.configure(text="Đang dừng…")
-        self._ghi("Đang dừng — chờ các file đang xử lý dở xong rồi ghi báo cáo…")
+        self._ghi("Đang dừng — bỏ các file đang xử lý dở (lần sau chạy lại), ghi báo cáo cho các file đã xong…")
 
     def cat_chot(self):
         vao, ra = self.v["vao"].get().strip(), self.v["ra"].get().strip()
@@ -817,6 +817,18 @@ def tu_kiem_tra(thu_muc: str) -> int:
         dat = len(kq) == 15 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")
+        # bấm Dừng giữa chừng: phải dừng ngay (không chờ file dở) và vẫn ghi báo cáo
+        import threading
+        import time
+        ev = threading.Event()
+        threading.Timer(2, ev.set).start()
+        t0 = time.time()
+        tvb.chay_tach(goc / "scan", goc / "ket_qua_dung", cfg, so_luong=2, log=lambda s: None, dung=ev)
+        dung_sau = time.time() - t0
+        nhat_ky.append(f"Bấm Dừng sau 2s: dừng hẳn sau {dung_sau:.1f}s")
+        if dung_sau > 20:
+            dat = False
+            thieu.append(f"bấm Dừng mà {dung_sau:.0f}s mới dừng")
         nhat_ky.append("KẾT QUẢ: ĐẠT" if dat else f"KẾT QUẢ: KHÔNG ĐẠT (lỗi: {loi}, không đạt như mong đợi: {thieu})")
     except Exception:
         import traceback

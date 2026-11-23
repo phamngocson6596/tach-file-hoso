@@ -87,6 +87,12 @@ Mở giao diện theo một trong các cách sau:
 
 Cấu hình được lưu tự động cho lần mở sau. Chạy lại cùng thư mục kết quả sẽ không phải OCR lại, nên thử đổi tuỳ chọn gần như tức thì.
 
+**Song song, Dừng và file bị treo**
+
+- **Song song** là số file đọc cùng lúc. Đặt cao quá thì các file tranh CPU và RAM, mỗi file chậm đi rất nhiều. Máy văn phòng nên để **3–4**. Lỗi "tiến trình dừng bất thường / thiếu bộ nhớ" thì giảm số này.
+- Bấm **■ Dừng** là dừng ngay: các file đang đọc dở bị bỏ, báo cáo vẫn được ghi cho các file đã xong. Chạy lại cùng thư mục kết quả thì các file đã xong không phải OCR lại.
+- Một file chạy quá **15 phút + 3 phút/trang** thì bị coi là treo: công cụ bỏ qua, ghi `LOI` kèm lý do rồi chạy tiếp. Thường do file hỏng, file quá nặng, hoặc ổ mạng bị ngắt giữa chừng. Lý do lỗi của từng file hiện ngay trong nhật ký và ở cột `canh_bao`.
+
 ### Ý nghĩa các tuỳ chọn "Cấu trúc hồ sơ"
 
 **Mỗi file scan chứa:**
