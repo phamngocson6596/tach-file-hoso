@@ -467,10 +467,18 @@ def cham_diem_doan(doan: list[dict], info: list[dict], trang: list[dict], rel: s
 
 
 def chon_van_ban_chinh(doan, diem):
-    """Chế độ 1 văn bản/file: văn bản dẫn trước văn bản thứ hai từ 2 điểm trở lên là văn bản chính."""
+    """Chế độ 1 văn bản/file: LUÔN chọn đúng 1 văn bản. Trả (chọn, tổng điểm, chắc chắn?).
+    Văn bản đủ tiêu đề + lời chứng được ưu tiên tuyệt đối (văn bản thiếu lời chứng thường là tờ bìa, bản sao lẻ
+    trong hồ sơ); trong số đó, dẫn trước văn bản thứ hai từ 2 điểm là chắc chắn, không thì vẫn chọn điểm cao nhất
+    (bằng điểm thì lấy văn bản đứng trước) nhưng báo cần xem lại."""
     tong = [d + (2 if v["co_md"] and v["co_lc"] else 0) for v, (d, _) in zip(doan, diem)]
-    xep = sorted(range(len(doan)), key=lambda k: -tong[k])
-    return (xep[0] if tong[xep[0]] - tong[xep[1]] >= 2 else None), tong
+    du = [k for k, v in enumerate(doan) if v["co_md"] and v["co_lc"]]
+    ung_vien = du or list(range(len(doan)))
+    xep = sorted(ung_vien, key=lambda k: (-tong[k], k))
+    chac = len(xep) == 1 or tong[xep[0]] - tong[xep[1]] >= 2
+    if not du:
+        chac = False
+    return xep[0], tong, chac
 
 
 def khoang(ds: list[int]) -> str:
@@ -958,14 +966,16 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
                 return f"VB{k+1} tr.{khoang(doan[k]['trang'])}" + (f" {m}" if m else "")
 
             if cfg["mot_van_ban"]:
-                chon, tong = chon_van_ban_chinh(doan, diem)
+                chon, tong, chac = chon_van_ban_chinh(doan, diem)
                 tom = "; ".join(f"{ten(k)} = {tong[k]}đ" for k in range(len(doan)))
-                if chon is not None:
-                    ly = (["đủ tiêu đề + lời chứng"] if doan[chon]["co_md"] and doan[chon]["co_lc"] else []) + diem[chon][1]
+                ly = (["đủ tiêu đề + lời chứng"] if doan[chon]["co_md"] and doan[chon]["co_lc"] else []) + diem[chon][1]
+                if chac:
                     thong_tin.append(f"chọn VB{chon+1} là văn bản chính ({', '.join(ly)}); văn bản khác coi là hồ sơ [{tom}]")
-                    doan, info = [doan[chon]], [info[chon]]
                 else:
-                    canh_bao.append(f"có {len(doan)} văn bản, chưa phân định được văn bản chính [{tom}]")
+                    canh_bao.append(f"có {len(doan)} văn bản, chưa chắc văn bản nào là chính: tạm chọn VB{chon+1}"
+                                    f"{' (' + ', '.join(ly) + ')' if ly else ''}, văn bản khác để ở hồ sơ — "
+                                    f"sai thì sửa cột trang_van_ban [{tom}]")
+                doan, info = [doan[chon]], [info[chon]]
             else:
                 giu = [k for k in range(len(doan)) if diem[k][0] >= 0]
                 bo = [k for k in range(len(doan)) if diem[k][0] < 0]

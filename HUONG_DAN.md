@@ -119,7 +119,7 @@ Cấu hình được lưu tự động cho lần mở sau. Chạy lại cùng th
 
 Cách quyết định:
 
-- **Một văn bản/file:** cộng điểm các dấu hiệu, cộng thêm +2 nếu văn bản có đủ tiêu đề và lời chứng. Văn bản dẫn trước văn bản thứ hai **từ 2 điểm trở lên** được chọn làm văn bản chính. Nếu không, file được báo cần kiểm tra.
+- **Một văn bản/file:** luôn xuất **đúng 1 văn bản**. Văn bản có đủ tiêu đề và lời chứng được ưu tiên tuyệt đối; văn bản thiếu lời chứng (tờ bìa, bản sao lẻ trong hồ sơ) chỉ được chọn khi không còn văn bản nào đủ. Trong số các văn bản đủ, cộng điểm các dấu hiệu: dẫn trước văn bản thứ hai **từ 2 điểm trở lên** là chắc chắn. Nếu không, công cụ vẫn tạm chọn văn bản điểm cao nhất (bằng điểm thì lấy văn bản đứng trước), các văn bản khác để ở hồ sơ, và báo cần kiểm tra để bạn xem lại.
 - **Nhiều văn bản/file:**
   - văn bản có tổng điểm **âm** bị loại vào hồ sơ;
   - văn bản có điểm **0 hoặc dương** được giữ;
@@ -153,7 +153,7 @@ KetQua/
 
 - **Đạt:** tìm thấy văn bản có tiêu đề, Quốc hiệu và lời chứng, và không có điểm nào đáng ngờ.
 - **Cần kiểm tra:** có ít nhất một trong các trường hợp sau:
-  - không phân định được văn bản chính;
+  - chưa chắc văn bản nào là văn bản chính (đã tạm chọn một văn bản);
   - thiếu lời chứng;
   - không thấy trang tiêu đề;
   - có trang hồ sơ xen giữa văn bản;
