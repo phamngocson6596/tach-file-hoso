@@ -192,6 +192,12 @@ def phan_tich_trang(text: str, muc_muc: float, nguong_trang: float) -> dict:
 # 2. GHÉP TRANG THÀNH VĂN BẢN
 # =====================================================================
 
+def _cung_tieu_de(a: str, b: str) -> bool:
+    import difflib
+    a, b = (re.sub(r"[^A-Z ]", "", bo_dau(x or "")).split() for x in (a, b))
+    return bool(a and b) and difflib.SequenceMatcher(None, " ".join(a), " ".join(b)).ratio() >= 0.75
+
+
 def chia_van_ban(trang: list[dict], can_quoc_hieu: bool = True) -> tuple[list[dict], list[str]]:
     """Trả về (danh sách văn bản tìm được, cảnh báo cấp file).
     Mỗi văn bản: dict(trang=[chỉ số 0-based], co_md, co_lc, quoc_hieu, canh_bao=[])."""
@@ -233,10 +239,21 @@ def chia_van_ban(trang: list[dict], can_quoc_hieu: bool = True) -> tuple[list[di
         t = trang[i]
         nh = t["nhan"]
         if nh == "MD":
+            bia = None
             if hien is not None:
-                hien["canh_bao"].append(f"tr.{i+1}: gặp tiêu đề mới khi văn bản trước chưa có lời chứng")
-                chot(hien)
-            hien = moi([i], True, t["quoc_hieu"])
+                c = hien["trang"][0]
+                # Tờ bìa: trang tiêu đề ít chữ, ngay sau là trang tiêu đề cùng tên (vd bìa "HỒ SƠ LƯU / Số cc /
+                # HỢP ĐỒNG MUA BÁN…" rồi tới trang đầu hợp đồng) -> bìa thuộc văn bản đó, không phải văn bản riêng
+                if (hien["co_md"] and len(hien["trang"]) == 1 and trang[c]["so_chu"] < CHU_NHIEU
+                        and _cung_tieu_de(trang[c].get("tieu_de"), t.get("tieu_de"))):
+                    bia = c
+                    trang[c].update(bia=True, ly_do=f"tờ bìa (cùng tiêu đề với tr.{i+1})")
+                else:
+                    hien["canh_bao"].append(f"tr.{i+1}: gặp tiêu đề mới khi văn bản trước chưa có lời chứng")
+                    chot(hien)
+            hien = moi([i] if bia is None else [bia, i], True, t["quoc_hieu"])
+            if bia is not None:
+                hien["bia"] = bia
             if not t["quoc_hieu"] and can_quoc_hieu:
                 hien["canh_bao"].append(f"tr.{i+1}: tiêu đề không kèm Quốc hiệu")
             i += 1
@@ -981,6 +998,17 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
                       for j, (i, chac) in sorted(trung.items()) if chac and (i in trong_doan or j in trong_doan)]
         for k, d in enumerate(doan):
             tien_to = f"VB{k+1}: " if len(doan) > 1 else ""
+            if d.get("bia") is not None:  # tờ bìa: lời chứng tính cả bìa thì giữ, không tính thì để ở hồ sơ
+                b = d["bia"]
+                so_tr = so_trang_theo_loi_chung(" ".join(bo_dau(doc[x]["text"]) for x in d["trang"]
+                                                         if trang[x]["nhan"] == "LC"))[1]
+                n_vb = sum(trang[x]["nhan"] != "TT" for x in d["trang"])
+                if so_tr and n_vb - 1 == so_tr:
+                    d["trang"].remove(b)
+                    trang[b].update(nhan="HS", ly_do="tờ bìa hồ sơ (lời chứng không tính trang này)")
+                    thong_tin.append(f"{tien_to}tr.{b+1} là tờ bìa, lời chứng không tính nên để ở phần hồ sơ")
+                else:
+                    thong_tin.append(f"{tien_to}tr.{b+1} là tờ bìa, đã gộp vào văn bản")
             # trùng chưa chắc chắn: chỉ bỏ khi bỏ đi thì số trang khớp đúng với lời chứng; không thì chỉ cảnh báo
             nghi_tr = [(j, i) for j, (i, chac) in sorted(trung.items()) if not chac and j in d["trang"] and i in d["trang"]]
             if nghi_tr:

@@ -807,14 +807,17 @@ def tu_kiem_tra(thu_muc: str) -> int:
         kq = tvb.chay_tach(goc / "scan", goc / "ket_qua", cfg, so_luong=2, log=nhat_ky.append)
         tt = {r["duong_dan"][0]: r["trang_thai"] for r in kq}
         nghi_trang = {r["duong_dan"][0] for r in kq if r.get("nghi_thieu_trang")}
-        mong_doi_dat = {"A", "B", "E", "H", "M"}
+        mong_doi_dat = {"A", "B", "E", "H", "M", "Q", "R"}
         mong_doi_nghi_trang = {"J", "K", "N", "O", "P"}  # L: chỉ lộ qua số Điều (dấu hiệu yếu) nên chỉ là lưu ý
         loi = [r["duong_dan"] for r in kq if r["trang_thai"] == "LOI"]
         thieu = sorted(k for k in mong_doi_dat if tt.get(k) != "DAT")
         sai_trang = sorted(mong_doi_nghi_trang ^ nghi_trang)
         nhat_ky.append(f"Trạng thái: {tt}")
         nhat_ky.append(f"Nghi thiếu/thừa trang: {sorted(nghi_trang)}")
-        dat = len(kq) == 15 and not loi and not thieu and not sai_trang
+        vb = {r["duong_dan"][0]: r["trang_van_ban"] for r in kq}
+        if vb.get("Q") != "2-6" or vb.get("R") != "3-6":  # tờ bìa: Q gộp vào văn bản, R để ở hồ sơ
+            thieu.append(f"tờ bìa: Q={vb.get('Q')} (cần 2-6), R={vb.get('R')} (cần 3-6)")
+        dat = len(kq) == 17 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")
         # bấm Dừng giữa chừng: phải dừng ngay (không chờ file dở) và vẫn ghi báo cáo

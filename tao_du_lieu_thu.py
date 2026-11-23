@@ -192,6 +192,17 @@ def so_do():
     return t
 
 
+def to_bia(tieu_de="HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT"):
+    """Tờ bìa hồ sơ lưu: Quốc hiệu, HỒ SƠ LƯU, số CC, tên hợp đồng, địa chỉ tài sản, tên văn phòng."""
+    t = Trang(); t.quoc_hieu(); t.y += 120
+    t.giua("HỒ SƠ LƯU", FT, 30); t.giua("Số cc: 001234", F); t.giua("Ngày: 15/3/2022", F, 200)
+    t.giua(tieu_de, FT, 60)
+    t.doan("Thửa đất số 123, tờ bản đồ số 45", le=300); t.doan("Phường 22, Quận Bình Thạnh", le=300)
+    t.y = 2900
+    t.giua("VĂN PHÒNG CÔNG CHỨNG HÒA AN - THÀNH PHỐ HỒ CHÍ MINH", F)
+    return t
+
+
 def trang_trang():
     return Trang()
 
@@ -256,7 +267,13 @@ def tao_tat_ca(ra):
     lc.y = 1250
     lc.doan("Văn bản này bao gồm năm trang.")
     ghi("P_thieu_trang_so_bang_chu.pdf", [vb[0], vb[1], vb[3], vb[4]], ra)
-    print(f"Đã tạo 15 file thử trong {ra}/")
+    # tờ bìa cùng tên hợp đồng nằm ngay trước trang đầu: lời chứng tính cả bìa (5 trang) -> bìa thuộc văn bản
+    ghi("Q_to_bia_tinh_vao_vb.pdf", [phieu_yc(), to_bia(), hd_dau(), hd_giua(), hd_ky(), *loi_chung(so_trang=5),
+                                     gcn()], ra)
+    # lời chứng không tính bìa (4 trang) -> bìa để ở phần hồ sơ
+    ghi("R_to_bia_khong_tinh.pdf", [phieu_yc(), to_bia(), hd_dau(), hd_giua(), hd_ky(), *loi_chung(so_trang=4),
+                                    gcn()], ra)
+    print(f"Đã tạo 17 file thử trong {ra}/")
 
 
 if __name__ == "__main__":

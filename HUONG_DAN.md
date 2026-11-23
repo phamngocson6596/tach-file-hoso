@@ -255,6 +255,7 @@ Chữ OCR được bỏ dấu và viết hoa trước khi so khớp, nên OCR sa
 
 - **Mở đầu:** có dòng viết hoa ở đầu trang bắt đầu bằng HỢP ĐỒNG, VĂN BẢN, GIẤY ỦY QUYỀN, DI CHÚC…
 - **Thân:** có "Điều 1, 2…", hoặc trang nhiều chữ, hoặc trang ký tên (BÊN A, BÊN B, "ký, ghi rõ họ tên").
+- **Tờ bìa:** trang ít chữ có tên hợp đồng, nằm ngay trước trang đầu của hợp đồng cùng tên (vd bìa "HỒ SƠ LƯU – Số cc – HỢP ĐỒNG MUA BÁN…"). Tờ bìa được gộp vào văn bản đó, không tách thành văn bản riêng. Nếu lời chứng ghi số trang mà không tính tờ bìa thì tờ bìa được để ở phần hồ sơ.
 - **Lời chứng:**
   - có dòng viết hoa "LỜI CHỨNG";
   - kết thúc ở dòng "Số công chứng…, quyển số…" hoặc dòng chữ ký "CÔNG CHỨNG VIÊN";
