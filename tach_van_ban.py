@@ -466,6 +466,47 @@ def cham_diem_doan(doan: list[dict], info: list[dict], trang: list[dict], rel: s
     return kq
 
 
+def cat_theo_vi_tri(doan: list[dict], trang: list[dict], vt: str) -> tuple[int, list[str], list[str]] | None:
+    """Chế độ 1 văn bản + văn bản luôn ở đầu (hoặc cuối) file: chỉ cần tìm ranh giới văn bản / hồ sơ.
+    - đầu file: văn bản = từ trang đầu file tới hết lời chứng ĐẦU TIÊN; sau đó là hồ sơ.
+    - cuối file: văn bản = văn bản có lời chứng CUỐI CÙNG; trước đó là hồ sơ.
+    Sửa doan[k] tại chỗ, trả (k, thông tin, cảnh báo); không văn bản nào có lời chứng thì trả None."""
+    co_lc = [k for k, d in enumerate(doan) if d["co_lc"]]
+    if not co_lc:
+        return None
+    k = co_lc[0] if vt == "dau" else co_lc[-1]
+    d = doan[k]
+    dau_vb = min(d["trang"])
+    manh_hs = lambda i: trang[i]["nhan"] == "HS" and trang[i]["manh"]  # noqa: E731
+    if vt == "dau":
+        st = 0
+        while st < dau_vb and (trang[st]["nhan"] == "TT" or manh_hs(st)):
+            st += 1
+        them = [i for i in range(st, dau_vb) if trang[i]["nhan"] != "TT" and not manh_hs(i)]
+    else:  # cuối: chỉ gộp thêm 1 trang tiêu đề lẻ nằm ngay trước (tờ bìa)
+        i = dau_vb - 1
+        while i >= 0 and trang[i]["nhan"] == "TT":
+            i -= 1
+        them = [i] if i >= 0 and trang[i]["nhan"] == "MD" and not any(i in x["trang"] for x in doan if x["co_lc"]) else []
+    tt, cb = [], []
+    if st_bo := ([i for i in range(0, dau_vb) if manh_hs(i) and (not them or i < min(them))] if vt == "dau" else []):
+        tt.append(f"tr.{khoang(st_bo)} ở đầu file giống hồ sơ, không đưa vào văn bản")
+    if them:
+        d["trang"] = sorted(set(d["trang"]) | set(them))
+        d["co_md"] = d["co_md"] or any(trang[i]["nhan"] == "MD" for i in them)
+        if len(them) == 1 and d.get("bia") is None:
+            d["bia"] = them[0]
+            trang[them[0]].update(bia=True, ly_do="trang nằm trước văn bản (coi như tờ bìa)")
+        elif len(them) > 1:
+            cb.append(f"tr.{khoang(them)} nằm trước văn bản, đã gộp vào theo tuỳ chọn 'văn bản ở đầu file' — "
+                      "cần xem lại")
+    con_lai = len(doan) - 1
+    if con_lai:
+        tt.append(f"theo tuỳ chọn 'văn bản ở {'đầu' if vt == 'dau' else 'cuối'} file': lấy văn bản tới hết lời chứng "
+                  f"{'đầu tiên' if vt == 'dau' else 'cuối cùng'}, {con_lai} văn bản khác coi là hồ sơ")
+    return k, tt, cb
+
+
 def chon_van_ban_chinh(doan, diem):
     """Chế độ 1 văn bản/file: LUÔN chọn đúng 1 văn bản. Trả (chọn, tổng điểm, chắc chắn?).
     Văn bản đủ tiêu đề + lời chứng được ưu tiên tuyệt đối (văn bản thiếu lời chứng thường là tờ bìa, bản sao lẻ
@@ -958,6 +999,22 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
         doan, cb_file = chia_van_ban(trang, cfg["can_quoc_hieu"])
         info = [thong_tin_doan(d, trang, [x["text"] for x in doc]) for d in doan]
         canh_bao, thong_tin = list(cb_file), []
+        theo_vi_tri = None
+        if cfg["mot_van_ban"] and cfg.get("vi_tri") in ("dau", "cuoi"):
+            theo_vi_tri = cat_theo_vi_tri(doan, trang, cfg["vi_tri"])
+        if theo_vi_tri:
+            k, tt, cb = theo_vi_tri
+            thong_tin += tt
+            canh_bao += cb
+            if len(doan) > 1:  # đối chiếu: các dấu hiệu khác có chỉ sang văn bản khác không (số CC, tên tổ chức, ngày)
+                diem = cham_diem_doan(doan, info, trang, rel, dict(cfg, vi_tri="tu_dong"))
+                tot = max((j for j in range(len(doan)) if j != k), key=lambda j: diem[j][0])
+                xau = [x for x in diem[k][1] if "không" in x or "khác" in x or "cũ hơn" in x]
+                if xau and diem[tot][0] - diem[k][0] >= 3:
+                    canh_bao.append(f"văn bản ở {'đầu' if cfg['vi_tri'] == 'dau' else 'cuối'} file có dấu hiệu "
+                                    f"là bản sao ({', '.join(xau)}), còn văn bản tr.{khoang(doan[tot]['trang'])} "
+                                    f"thì {', '.join(diem[tot][1]) or 'không'} — cần xem lại")
+            doan, info = [doan[k]], [info[k]]
         if len(doan) > 1:
             diem = cham_diem_doan(doan, info, trang, rel, cfg)
 

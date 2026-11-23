@@ -113,13 +113,14 @@ Cấu hình được lưu tự động cho lần mở sau. Chạy lại cùng th
 
 Ý nghĩa của tuỳ chọn **vị trí**:
 
-- **Chế độ một văn bản:** văn bản đầu tiên (hoặc cuối cùng) được +2.
+- **Chế độ một văn bản + Đầu file:** không chấm điểm nữa mà chỉ tìm **ranh giới**: văn bản là từ đầu file tới hết **lời chứng đầu tiên**, phần sau là hồ sơ. Tờ bìa hay trang lẻ nằm trước văn bản được gộp vào (rồi đối chiếu số trang lời chứng như bình thường). Trang hồ sơ rõ ràng ở đầu file (vd phiếu yêu cầu) được bỏ qua. **Cuối file** thì ngược lại: văn bản là văn bản có lời chứng cuối cùng. Đây là cách chắc nhất nếu đơn vị luôn xếp văn bản trước (hoặc sau) hồ sơ.
+  - Nếu số công chứng, tên tổ chức hoặc ngày công chứng cho thấy văn bản lấy được là bản sao, còn một văn bản khác mới là của đơn vị, file vẫn bị báo cần kiểm tra.
 - **Chế độ nhiều văn bản:** chỉ giữ các văn bản **xếp liền nhau** ở đầu (hoặc cuối) file, được +2. Văn bản nằm sau một trang hồ sơ bị −2.
 - Nếu đơn vị xếp xen kẽ (VB1, hồ sơ 1, VB2, hồ sơ 2) thì chọn **Không cố định**.
 
 Cách quyết định:
 
-- **Một văn bản/file:** luôn xuất **đúng 1 văn bản**. Văn bản có đủ tiêu đề và lời chứng được ưu tiên tuyệt đối; văn bản thiếu lời chứng (tờ bìa, bản sao lẻ trong hồ sơ) chỉ được chọn khi không còn văn bản nào đủ. Trong số các văn bản đủ, cộng điểm các dấu hiệu: dẫn trước văn bản thứ hai **từ 2 điểm trở lên** là chắc chắn. Nếu không, công cụ vẫn tạm chọn văn bản điểm cao nhất (bằng điểm thì lấy văn bản đứng trước), các văn bản khác để ở hồ sơ, và báo cần kiểm tra để bạn xem lại.
+- **Một văn bản/file** (khi vị trí là *Không cố định*): luôn xuất **đúng 1 văn bản**. Văn bản có đủ tiêu đề và lời chứng được ưu tiên tuyệt đối; văn bản thiếu lời chứng (tờ bìa, bản sao lẻ trong hồ sơ) chỉ được chọn khi không còn văn bản nào đủ. Trong số các văn bản đủ, cộng điểm các dấu hiệu: dẫn trước văn bản thứ hai **từ 2 điểm trở lên** là chắc chắn. Nếu không, công cụ vẫn tạm chọn văn bản điểm cao nhất (bằng điểm thì lấy văn bản đứng trước), các văn bản khác để ở hồ sơ, và báo cần kiểm tra để bạn xem lại.
 - **Nhiều văn bản/file:**
   - văn bản có tổng điểm **âm** bị loại vào hồ sơ;
   - văn bản có điểm **0 hoặc dương** được giữ;

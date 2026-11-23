@@ -227,7 +227,8 @@ class UngDung(tk.Tk):
         for ten in VI_TRI:
             w = ttk.Radiobutton(r, text=ten, variable=self.v["vi_tri"], value=ten)
             w.pack(side="left", padx=(0, 12))
-            GoiY(w, "Một văn bản/file: văn bản đầu tiên (hoặc cuối cùng) được ưu tiên.\n"
+            GoiY(w, "Một văn bản/file + Đầu file: văn bản = từ đầu file tới hết lời chứng đầu tiên, phần sau là hồ sơ "
+                    "(Cuối file: văn bản có lời chứng cuối cùng). Cách chắc nhất nếu đơn vị luôn scan văn bản trước.\n"
                     "Nhiều văn bản/file: chỉ giữ các văn bản xếp liền nhau ở đầu (hoặc cuối) file; văn bản nằm sau "
                     "trang hồ sơ bị coi là bản sao. Chỉ chọn khi đơn vị luôn xếp hết văn bản lên trước (hoặc ra sau) "
                     "hồ sơ — nếu xếp xen kẽ (VB1, hồ sơ 1, VB2, hồ sơ 2) thì để Không cố định.")
@@ -817,6 +818,12 @@ def tu_kiem_tra(thu_muc: str) -> int:
         vb = {r["duong_dan"][0]: r["trang_van_ban"] for r in kq}
         if vb.get("Q") != "2-6" or vb.get("R") != "3-6":  # tờ bìa: Q gộp vào văn bản, R để ở hồ sơ
             thieu.append(f"tờ bìa: Q={vb.get('Q')} (cần 2-6), R={vb.get('R')} (cần 3-6)")
+        # "Một văn bản" + "văn bản ở đầu file": văn bản = từ đầu file tới hết lời chứng đầu tiên (chạy lại, dùng cache)
+        kq_dau = tvb.chay_tach(goc / "scan", goc / "ket_qua", dict(cfg, vi_tri="dau"), so_luong=2, log=lambda s: None)
+        vb_dau = {r["duong_dan"][0]: (r["trang_thai"], r["trang_van_ban"]) for r in kq_dau}
+        nhat_ky.append(f"Văn bản ở đầu file: C={vb_dau.get('C')}, I={vb_dau.get('I')}, A={vb_dau.get('A')}")
+        if vb_dau.get("C") != ("DAT", "1-3") or vb_dau.get("I") != ("DAT", "1-3") or vb_dau.get("A") != ("DAT", "3-6"):
+            thieu.append(f"tuỳ chọn văn bản ở đầu file: {vb_dau}")
         dat = len(kq) == 17 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")
