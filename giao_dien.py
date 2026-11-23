@@ -836,14 +836,17 @@ def tu_kiem_tra(thu_muc: str) -> int:
         kq = tvb.chay_tach(goc / "scan", goc / "ket_qua", cfg, so_luong=2, log=nhat_ky.append)
         tt = {r["duong_dan"][0]: r["trang_thai"] for r in kq}
         nghi_trang = {r["duong_dan"][0] for r in kq if r.get("nghi_thieu_trang")}
-        mong_doi_dat = {"A", "B", "E", "H", "M", "Q", "R", "S"}
-        mong_doi_nghi_trang = {"J", "K", "N", "O", "P"}  # L: chỉ lộ qua số Điều (dấu hiệu yếu) nên chỉ là lưu ý
+        mong_doi_dat = {"A", "B", "E", "H", "M", "Q", "R", "S", "V"}
+        mong_doi_nghi_trang = {"J", "K", "N", "O", "P", "T"}  # L: chỉ lộ qua số Điều (dấu hiệu yếu) nên chỉ là lưu ý
         loi = [r["duong_dan"] for r in kq if r["trang_thai"] == "LOI"]
         thieu = sorted(k for k in mong_doi_dat if tt.get(k) != "DAT")
         sai_trang = sorted(mong_doi_nghi_trang ^ nghi_trang)
         nhat_ky.append(f"Trạng thái: {tt}")
         nhat_ky.append(f"Nghi thiếu/thừa trang: {sorted(nghi_trang)}")
         vb = {r["duong_dan"][0]: r["trang_van_ban"] for r in kq}
+        cb_t = next((r["canh_bao"] for r in kq if r["duong_dan"][0] == "T"), "")
+        if "lạc chỗ ở tr.6" not in cb_t:  # trang scan lạc chỗ phải được chỉ ra
+            thieu.append(f"T: không chỉ ra trang scan lạc chỗ ({cb_t[:80]})")
         if vb.get("Q") != "2-6" or vb.get("R") != "3-6":  # tờ bìa: Q gộp vào văn bản, R để ở hồ sơ
             thieu.append(f"tờ bìa: Q={vb.get('Q')} (cần 2-6), R={vb.get('R')} (cần 3-6)")
         # "Một văn bản" + "văn bản ở đầu file": văn bản = từ đầu file tới hết lời chứng đầu tiên (chạy lại, dùng cache)
@@ -859,7 +862,7 @@ def tu_kiem_tra(thu_muc: str) -> int:
         nhat_ky.append(f"Nhiều văn bản ở đầu file: I={vb_nd.get('I')}, C={vb_nd.get('C')}, E={vb_nd.get('E')}")
         if vb_nd.get("I") != ("DAT", "1-3;4-6") or vb_nd.get("C") != ("DAT", "1-3") or vb_nd.get("E") != ("DAT", "2-4"):
             thieu.append(f"kiểu nhiều văn bản ở đầu file: {vb_nd}")
-        dat = len(kq) == 18 and not loi and not thieu and not sai_trang
+        dat = len(kq) == 20 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")
         # bấm Dừng giữa chừng: phải dừng ngay (không chờ file dở) và vẫn ghi báo cáo

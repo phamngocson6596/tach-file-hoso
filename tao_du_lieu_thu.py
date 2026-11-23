@@ -287,7 +287,11 @@ def tao_tat_ca(ra):
     # dấu "HỒ SƠ LƯU / Số cc / Ngày" đóng sát tên hợp đồng: OCR ghép chung một dòng, vẫn phải nhận là trang tiêu đề
     ghi("S_dau_ho_so_luu_canh_tieu_de.pdf", [hd_dau("HỢP ĐỒNG THẾ CHẤP TÀI SẢN", dau_luu=True), hd_giua(), hd_ky(), *loi_chung(so_trang=4),
                                              gcn()], ra)
-    print(f"Đã tạo 18 file thử trong {ra}/")
+    # 1 trang hợp đồng bị scan lạc ra sau hồ sơ: lời chứng ghi 4 trang, tách được 3 -> chỉ ra trang lạc chỗ
+    ghi("T_trang_scan_lac_cho.pdf", [hd_dau(), hd_ky(), *loi_chung(so_trang=4), phieu_yc(), gcn(), hd_giua()], ra)
+    # hồ sơ có trang hợp đồng khác (nhiều 'Điều…'), văn bản đủ trang theo lời chứng -> chỉ ghi chú, vẫn Đạt
+    ghi("V_hd_khac_trong_ho_so.pdf", [hd_dau(), hd_ky(), *loi_chung(so_trang=3), phieu_yc(), gcn(), hd_giua()], ra)
+    print(f"Đã tạo 20 file thử trong {ra}/")
 
 
 if __name__ == "__main__":
