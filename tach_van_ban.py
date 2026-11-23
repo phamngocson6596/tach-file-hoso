@@ -507,6 +507,40 @@ def cat_theo_vi_tri(doan: list[dict], trang: list[dict], vt: str) -> tuple[int, 
     return k, tt, cb
 
 
+def khoi_theo_vi_tri(doan: list[dict], trang: list[dict], vt: str) -> tuple[list[int], list[str]]:
+    """Chế độ nhiều văn bản + các văn bản xếp liền nhau ở đầu (hoặc cuối) file: giữ mọi văn bản từ đầu file cho
+    tới trang hồ sơ RÕ RÀNG đầu tiên (phiếu yêu cầu, CCCD, sổ đỏ, bản sao…) nằm sau một văn bản; từ đó trở đi là
+    hồ sơ. Trang hồ sơ rõ ràng ở đầu file (trước văn bản đầu tiên) không tính là ranh giới.
+    Văn bản chỉ có 1 trang và không có lời chứng nằm ngay trước văn bản kế tiếp được gộp vào đó (tờ bìa).
+    Sửa doan tại chỗ; trả (chỉ số các văn bản giữ, thông tin)."""
+    n = len(doan)
+    thu_tu = list(range(n)) if vt == "dau" else list(range(n - 1, -1, -1))
+    giu = [thu_tu[0]]
+    for a, b in zip(thu_tu, thu_tu[1:]):
+        tu, toi = sorted((max(doan[a]["trang"]), min(doan[b]["trang"]))) if vt == "dau" else \
+            sorted((max(doan[b]["trang"]), min(doan[a]["trang"])))
+        if any(trang[i]["nhan"] == "HS" and trang[i]["manh"] for i in range(tu + 1, toi)):
+            break
+        giu.append(b)
+    giu.sort()
+    # tờ bìa / trang tiêu đề lẻ không có lời chứng -> gộp vào văn bản ngay sau
+    for x, y in zip(giu, giu[1:]):
+        d = doan[x]
+        if not d["co_lc"] and sum(trang[i]["nhan"] != "TT" for i in d["trang"]) == 1 and doan[y].get("bia") is None:
+            b = min(i for i in d["trang"] if trang[i]["nhan"] != "TT")
+            doan[y]["trang"] = sorted(set(doan[y]["trang"]) | {b})
+            doan[y]["bia"] = b
+            doan[y]["co_md"] = doan[y]["co_md"] or trang[b]["nhan"] == "MD"
+            trang[b].update(bia=True, ly_do="trang lẻ nằm trước văn bản (coi như tờ bìa)")
+            d["trang"] = []
+    giu = [k for k in giu if doan[k]["trang"]]
+    tt = []
+    if len(giu) < n:
+        tt.append(f"theo kiểu 'nhiều văn bản ở {'đầu' if vt == 'dau' else 'cuối'} file': giữ {len(giu)} văn bản liền "
+                  f"nhau, {n - len(giu)} văn bản {'sau' if vt == 'dau' else 'trước'} trang hồ sơ coi là hồ sơ")
+    return giu, tt
+
+
 def chon_van_ban_chinh(doan, diem):
     """Chế độ 1 văn bản/file: LUÔN chọn đúng 1 văn bản. Trả (chọn, tổng điểm, chắc chắn?).
     Văn bản đủ tiêu đề + lời chứng được ưu tiên tuyệt đối (văn bản thiếu lời chứng thường là tờ bìa, bản sao lẻ
@@ -1015,7 +1049,26 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
                                     f"là bản sao ({', '.join(xau)}), còn văn bản tr.{khoang(doan[tot]['trang'])} "
                                     f"thì {', '.join(diem[tot][1]) or 'không'} — cần xem lại")
             doan, info = [doan[k]], [info[k]]
-        if len(doan) > 1:
+        elif not cfg["mot_van_ban"] and cfg.get("vi_tri") in ("dau", "cuoi") and len(doan) > 1:
+            giu, tt = khoi_theo_vi_tri(doan, trang, cfg["vi_tri"])
+            thong_tin += tt
+            # đối chiếu: văn bản giữ mà dấu hiệu chỉ là bản sao, hoặc văn bản bỏ mà số CC khớp tên file -> xem lại
+            diem = cham_diem_doan(doan, info, trang, rel, dict(cfg, vi_tri="tu_dong"))
+            for k in giu:
+                xau = [x for x in diem[k][1] if "không" in x or "khác" in x or "cũ hơn" in x]
+                if xau and diem[k][0] < 0:
+                    canh_bao.append(f"văn bản tr.{khoang(doan[k]['trang'])} có dấu hiệu là bản sao "
+                                    f"({', '.join(xau)}) — cần xem lại")
+            for k in range(len(doan)):
+                if k not in giu and doan[k]["trang"] and any("khớp tên file" in x for x in diem[k][1]):
+                    canh_bao.append(f"văn bản tr.{khoang(doan[k]['trang'])} nằm sau trang hồ sơ nhưng số CC khớp "
+                                    "tên file, chưa lấy — cần xem lại")
+            doan, info = [doan[k] for k in giu], [info[k] for k in giu]
+            if len(doan) > 1:
+                thong_tin.append(f"giữ {len(doan)} văn bản: " + "; ".join(
+                    f"VB{j+1} tr.{khoang(d['trang'])}" + (f" {mo_ta_doan(info[j])}" if mo_ta_doan(info[j]) else "")
+                    for j, d in enumerate(doan)))
+        if len(doan) > 1 and not (not cfg["mot_van_ban"] and cfg.get("vi_tri") in ("dau", "cuoi")):
             diem = cham_diem_doan(doan, info, trang, rel, cfg)
 
             def ten(k):
@@ -1859,7 +1912,7 @@ def main():
     g.add_argument("--nhieu-van-ban", action="store_true",
                    help="1 file có thể chứa nhiều văn bản công chứng (mặc định: chỉ 1, văn bản khác coi là hồ sơ)")
     g.add_argument("--vi-tri", choices=["tu_dong", "dau", "cuoi"], default="tu_dong",
-                   help="văn bản chính thường nằm ở đầu/cuối file")
+                   help="văn bản luôn xếp ở đầu/cuối file: cắt theo ranh giới văn bản / hồ sơ thay vì chấm điểm")
     g.add_argument("--so-cc-trong-ten", action="store_true", help="tên file/thư mục chứa số công chứng")
     g.add_argument("--ten-to-chuc", default="", help="tên tổ chức hành nghề công chứng của mình")
     g.add_argument("--khong-uu-tien-ngay", action="store_true", help="không dùng ngày công chứng để chọn văn bản chính")

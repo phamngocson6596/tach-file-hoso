@@ -95,33 +95,30 @@ Cấu hình được lưu tự động cho lần mở sau. Chạy lại cùng th
 
 ### Ý nghĩa các tuỳ chọn "Cấu trúc hồ sơ"
 
-**Mỗi file scan chứa:**
+**Kiểu sắp xếp** — đơn vị xếp văn bản và hồ sơ trong file scan thế nào:
 
-| Lựa chọn | Khi nào dùng |
-|---|---|
-| **Một văn bản công chứng** (mặc định) | Mỗi file tương ứng với một số công chứng. Nếu file có nhiều văn bản, công cụ chấm điểm và chọn **1 văn bản chính**. Các văn bản còn lại được coi là hồ sơ. |
-| **Có thể nhiều văn bản công chứng** | Đơn vị scan nhiều giao dịch vào chung một file. Mỗi văn bản được cắt thành file riêng (`…__vb1.pdf`, `…__vb2.pdf`). Văn bản nào có dấu hiệu là **bản sao lưu trong hồ sơ** thì bị loại. |
+| Kiểu | Cách cắt | CLI |
+|---|---|---|
+| **1 văn bản, xếp ở đầu file** | Văn bản = từ đầu file tới hết **lời chứng đầu tiên**; phần sau là hồ sơ. Tờ bìa / trang lẻ nằm trước văn bản được gộp vào (rồi đối chiếu số trang lời chứng). Trang hồ sơ rõ ràng ở đầu file (vd phiếu yêu cầu) được bỏ qua. | `--vi-tri dau` |
+| **Nhiều văn bản, xếp liền nhau ở đầu file** | Giữ mọi văn bản từ đầu file cho tới **trang hồ sơ rõ ràng đầu tiên** (phiếu yêu cầu, CCCD, sổ đỏ, bản sao có "sao y"…); từ đó trở xuống là hồ sơ. Trang mờ, trang ít chữ không tính là ranh giới. Mỗi văn bản ra 1 file (`…__vb1`, `…__vb2`). | `--nhieu-van-ban --vi-tri dau` |
+| **1 văn bản, xếp ở cuối file** | Văn bản = văn bản có lời chứng cuối cùng; phía trước là hồ sơ. | `--vi-tri cuoi` |
+| **Nhiều văn bản, xếp liền nhau ở cuối file** | Giữ mọi văn bản từ cuối file ngược lên tới trang hồ sơ rõ ràng gần nhất. | `--nhieu-van-ban --vi-tri cuoi` |
+| **1 văn bản, vị trí không cố định (chấm điểm)** (mặc định) | Chấm điểm theo các dấu hiệu bên dưới, chọn **đúng 1 văn bản chính**. | (mặc định) |
+| **Nhiều văn bản, xếp xen kẽ với hồ sơ (chấm điểm)** | VB1, hồ sơ 1, VB2, hồ sơ 2…: chấm điểm, giữ văn bản của đơn vị, loại bản sao văn bản cũ. | `--nhieu-van-ban` |
 
-**Dấu hiệu nhận ra văn bản của đơn vị.** Các dấu hiệu này dùng cho **cả hai chế độ** trên.
+Biết chắc đơn vị luôn xếp văn bản trước (hoặc sau) hồ sơ thì chọn kiểu **đầu file / cuối file**: công cụ chỉ cần tìm ranh giới, chính xác hơn chấm điểm. Không chắc, hoặc xếp xen kẽ, thì chọn kiểu **chấm điểm**. Xếp xen kẽ mà chọn "nhiều văn bản ở đầu file" thì chỉ lấy được các văn bản trước trang hồ sơ đầu tiên.
+
+**Dấu hiệu nhận ra văn bản của đơn vị.**
 
 | Dấu hiệu | Văn bản của đơn vị | Bản sao trong hồ sơ |
 |---|---|---|
 | **Số công chứng có trong tên file/thư mục** (ví dụ `2022/1234.pdf`, `1234_1235.pdf`) | số trong lời chứng khớp với tên file: **+6** | đọc được số nhưng không khớp: **−6** |
 | **Tên tổ chức** — **ghi ngắn**, chỉ tên văn phòng (ví dụ *Văn phòng công chứng Hòa An*), không ghi địa chỉ hay tỉnh/thành | lời chứng ghi đúng tên (chịu được OCR sai vài chữ): **+3** | lời chứng ghi rõ tên văn phòng hoặc phòng công chứng khác hẳn: **−3**. Không đọc được tên tổ chức nào thì không cộng không trừ |
 | **Ngày công chứng mới nhất** (mặc định bật) | cùng ngày hoặc gần ngày (không quá 30 ngày) với văn bản mới nhất trong file: **+2** | cũ hơn quá 30 ngày: **−2** |
-| **Văn bản nằm ở: Đầu / Cuối file** | xem giải thích dưới bảng | xem giải thích dưới bảng |
 
-Ý nghĩa của tuỳ chọn **vị trí**:
-
-- **Chế độ một văn bản + Đầu file:** không chấm điểm nữa mà chỉ tìm **ranh giới**: văn bản là từ đầu file tới hết **lời chứng đầu tiên**, phần sau là hồ sơ. Tờ bìa hay trang lẻ nằm trước văn bản được gộp vào (rồi đối chiếu số trang lời chứng như bình thường). Trang hồ sơ rõ ràng ở đầu file (vd phiếu yêu cầu) được bỏ qua. **Cuối file** thì ngược lại: văn bản là văn bản có lời chứng cuối cùng. Đây là cách chắc nhất nếu đơn vị luôn xếp văn bản trước (hoặc sau) hồ sơ.
-  - Nếu số công chứng, tên tổ chức hoặc ngày công chứng cho thấy văn bản lấy được là bản sao, còn một văn bản khác mới là của đơn vị, file vẫn bị báo cần kiểm tra.
-- **Chế độ nhiều văn bản:** chỉ giữ các văn bản **xếp liền nhau** ở đầu (hoặc cuối) file, được +2. Văn bản nằm sau một trang hồ sơ bị −2.
-- Nếu đơn vị xếp xen kẽ (VB1, hồ sơ 1, VB2, hồ sơ 2) thì chọn **Không cố định**.
-
-Cách quyết định:
-
-- **Một văn bản/file** (khi vị trí là *Không cố định*): luôn xuất **đúng 1 văn bản**. Văn bản có đủ tiêu đề và lời chứng được ưu tiên tuyệt đối; văn bản thiếu lời chứng (tờ bìa, bản sao lẻ trong hồ sơ) chỉ được chọn khi không còn văn bản nào đủ. Trong số các văn bản đủ, cộng điểm các dấu hiệu: dẫn trước văn bản thứ hai **từ 2 điểm trở lên** là chắc chắn. Nếu không, công cụ vẫn tạm chọn văn bản điểm cao nhất (bằng điểm thì lấy văn bản đứng trước), các văn bản khác để ở hồ sơ, và báo cần kiểm tra để bạn xem lại.
-- **Nhiều văn bản/file:**
+- **Kiểu đầu file / cuối file:** các dấu hiệu này **không dùng để chọn**, chỉ để đối chiếu. Văn bản lấy được mà có dấu hiệu là bản sao (lời chứng ghi tổ chức khác, ngày cũ hơn, số công chứng không khớp tên file), hoặc văn bản bị để ở hồ sơ mà số công chứng khớp tên file, thì file bị báo **cần kiểm tra**.
+- **Kiểu chấm điểm, 1 văn bản:** luôn xuất **đúng 1 văn bản**. Văn bản có đủ tiêu đề và lời chứng được ưu tiên tuyệt đối; văn bản thiếu lời chứng (tờ bìa, bản sao lẻ trong hồ sơ) chỉ được chọn khi không còn văn bản nào đủ. Trong số các văn bản đủ, dẫn trước văn bản thứ hai **từ 2 điểm trở lên** là chắc chắn. Nếu không, công cụ vẫn tạm chọn văn bản điểm cao nhất (bằng điểm thì lấy văn bản đứng trước), các văn bản khác để ở hồ sơ, và báo cần kiểm tra.
+- **Kiểu chấm điểm, nhiều văn bản:**
   - văn bản có tổng điểm **âm** bị loại vào hồ sơ;
   - văn bản có điểm **0 hoặc dương** được giữ;
   - nếu có văn bản được 0 điểm trong khi văn bản khác có dấu hiệu, văn bản đó bị đánh dấu cần kiểm tra;

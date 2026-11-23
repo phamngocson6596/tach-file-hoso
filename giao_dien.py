@@ -31,6 +31,31 @@ F_CAU_HINH = Path.home() / ".tach_van_ban_cauhinh.json"
 
 ENGINE = {"Tesseract (khuyên dùng)": "tesseract", "Screen AI của Chrome (thử nghiệm)": "screenai"}
 VI_TRI = {"Không cố định": "tu_dong", "Đầu file": "dau", "Cuối file": "cuoi"}
+# Kiểu sắp xếp hồ sơ = (mỗi file một/nhiều văn bản, vị trí văn bản), kèm mô tả cách cắt
+KIEU_SAP_XEP = {
+    "1 văn bản, xếp ở đầu file": (
+        "mot", "Đầu file",
+        "Văn bản = từ đầu file tới hết lời chứng đầu tiên; phần sau là hồ sơ. Tờ bìa trước văn bản được gộp vào. "
+        "Chắc chắn nhất nếu đơn vị luôn scan văn bản trước hồ sơ."),
+    "Nhiều văn bản, xếp liền nhau ở đầu file": (
+        "nhieu", "Đầu file",
+        "Giữ mọi văn bản từ đầu file cho tới trang hồ sơ rõ ràng đầu tiên (phiếu yêu cầu, CCCD, sổ đỏ, bản sao…); "
+        "từ đó trở xuống là hồ sơ. Mỗi văn bản ra 1 file (…__vb1, …__vb2)."),
+    "1 văn bản, xếp ở cuối file": (
+        "mot", "Cuối file",
+        "Văn bản = văn bản có lời chứng cuối cùng; phía trước là hồ sơ."),
+    "Nhiều văn bản, xếp liền nhau ở cuối file": (
+        "nhieu", "Cuối file",
+        "Giữ mọi văn bản từ cuối file ngược lên tới trang hồ sơ rõ ràng gần nhất; phía trước là hồ sơ."),
+    "1 văn bản, vị trí không cố định (chấm điểm)": (
+        "mot", "Không cố định",
+        "Không biết văn bản nằm đâu: chấm điểm theo các dấu hiệu bên dưới để chọn 1 văn bản chính, các văn bản "
+        "khác để ở hồ sơ."),
+    "Nhiều văn bản, xếp xen kẽ với hồ sơ (chấm điểm)": (
+        "nhieu", "Không cố định",
+        "Văn bản và hồ sơ xen kẽ (VB1, hồ sơ 1, VB2…): chấm điểm theo các dấu hiệu bên dưới, giữ văn bản của đơn "
+        "vị, loại bản sao văn bản cũ lưu trong hồ sơ."),
+}
 MAU_VB = ["{ten}", "{ten}_VB", "{nam}_{so_cc}", "{nam}_{so_cc}_{loai}", "{so_cc}_{loai}", "{ngay}_{so_cc}"]
 MAU_HS = ["{ten}", "{ten}_HS", "{nam}_{so_cc}_HS", "{so_cc}_HS"]
 NHAN_TT = {"DAT": ("Đạt", "#15803d"), "CAN_KIEM_TRA": ("Cần kiểm tra", "#b45309"),
@@ -110,6 +135,7 @@ class UngDung(tk.Tk):
             vao=tk.StringVar(), ra=tk.StringVar(),
             mot_van_ban=tk.StringVar(value="mot" if md["mot_van_ban"] else "nhieu"),
             vi_tri=tk.StringVar(value="Không cố định"),
+            kieu_sap_xep=tk.StringVar(),  # chỉ để hiển thị: suy ra từ mot_van_ban + vi_tri
             so_cc_trong_ten=tk.BooleanVar(value=md["so_cc_trong_ten"]),
             uu_tien_ngay_moi=tk.BooleanVar(value=md["uu_tien_ngay_moi"]),
             ten_to_chuc=tk.StringVar(value=md["ten_to_chuc"]),
@@ -203,35 +229,21 @@ class UngDung(tk.Tk):
         ttk.Label(f, text="Giúp phân biệt văn bản công chứng với bản sao hợp đồng cũ lưu trong hồ sơ.",
                   style="Goiy.TLabel").grid(row=0, column=0, columnspan=3, sticky="w", pady=(0, 4))
 
-        ttk.Label(f, text="Mỗi file scan chứa:").grid(row=1, column=0, sticky="nw", pady=2)
-        r = ttk.Frame(f)
-        r.grid(row=1, column=1, columnspan=2, sticky="w")
-        a = ttk.Radiobutton(r, text="Một văn bản công chứng (văn bản khác trong file coi là hồ sơ)",
-                            variable=self.v["mot_van_ban"], value="mot")
-        a.pack(anchor="w")
-        b = ttk.Radiobutton(r, text="Có thể nhiều văn bản công chứng — tách riêng từng văn bản",
-                            variable=self.v["mot_van_ban"], value="nhieu")
-        b.pack(anchor="w")
-        GoiY(a, "Thường gặp: 1 file = 1 số công chứng. Nếu file có nhiều văn bản, công cụ chấm điểm theo các "
-                "dấu hiệu bên dưới để chọn 1 văn bản chính; phần còn lại để ở hồ sơ.")
-        GoiY(b, "Dùng khi đơn vị scan nhiều giao dịch vào chung 1 file. Mỗi văn bản được cắt thành file riêng "
-                "(…__vb1.pdf, …__vb2.pdf). Văn bản có dấu hiệu là bản sao lưu trong hồ sơ (theo các ô bên dưới) "
-                "bị loại ra.")
-
-        ttk.Separator(f).grid(row=2, column=0, columnspan=3, sticky="ew", pady=6)
-        ttk.Label(f, text="Dấu hiệu nhận ra văn bản của đơn vị — để loại bản sao văn bản cũ lưu lẫn trong hồ sơ:",
-                  style="Goiy.TLabel").grid(row=3, column=0, columnspan=3, sticky="w")
-        ttk.Label(f, text="Văn bản nằm ở:").grid(row=4, column=0, sticky="w", pady=2)
-        r = ttk.Frame(f)
-        r.grid(row=4, column=1, columnspan=2, sticky="w")
-        for ten in VI_TRI:
-            w = ttk.Radiobutton(r, text=ten, variable=self.v["vi_tri"], value=ten)
-            w.pack(side="left", padx=(0, 12))
-            GoiY(w, "Một văn bản/file + Đầu file: văn bản = từ đầu file tới hết lời chứng đầu tiên, phần sau là hồ sơ "
-                    "(Cuối file: văn bản có lời chứng cuối cùng). Cách chắc nhất nếu đơn vị luôn scan văn bản trước.\n"
-                    "Nhiều văn bản/file: chỉ giữ các văn bản xếp liền nhau ở đầu (hoặc cuối) file; văn bản nằm sau "
-                    "trang hồ sơ bị coi là bản sao. Chỉ chọn khi đơn vị luôn xếp hết văn bản lên trước (hoặc ra sau) "
-                    "hồ sơ — nếu xếp xen kẽ (VB1, hồ sơ 1, VB2, hồ sơ 2) thì để Không cố định.")
+        ttk.Label(f, text="Kiểu sắp xếp:").grid(row=1, column=0, sticky="w", pady=2)
+        cb = ttk.Combobox(f, textvariable=self.v["kieu_sap_xep"], values=list(KIEU_SAP_XEP), state="readonly")
+        cb.grid(row=1, column=1, columnspan=2, sticky="ew", padx=4, pady=2)
+        cb.bind("<<ComboboxSelected>>", self._chon_kieu_sap_xep)
+        GoiY(cb, "Đơn vị xếp văn bản và hồ sơ trong file scan thế nào. Biết chắc văn bản luôn ở đầu (hoặc cuối) "
+                 "file thì chọn kiểu đó: công cụ chỉ cần tìm ranh giới văn bản / hồ sơ, chính xác hơn chấm điểm. "
+                 "Không chắc hoặc xếp xen kẽ thì chọn kiểu chấm điểm.")
+        self.lb_kieu = ttk.Label(f, text="", style="Goiy.TLabel", wraplength=520, justify="left")
+        self.lb_kieu.grid(row=2, column=1, columnspan=2, sticky="w", padx=4)
+        ttk.Separator(f).grid(row=3, column=0, columnspan=3, sticky="ew", pady=6)
+        self.lb_dau_hieu = ttk.Label(f, text="", style="Goiy.TLabel", wraplength=540, justify="left")
+        self.lb_dau_hieu.grid(row=4, column=0, columnspan=3, sticky="w")
+        for k in ("mot_van_ban", "vi_tri"):
+            self.v[k].trace_add("write", lambda *a: self._hien_kieu_sap_xep())
+        self._hien_kieu_sap_xep()
         w = ttk.Checkbutton(f, text="Số công chứng có trong tên file/thư mục (vd 2022_1234.pdf, 1234_1235.pdf)",
                             variable=self.v["so_cc_trong_ten"])
         w.grid(row=5, column=0, columnspan=3, sticky="w", pady=2)
@@ -259,6 +271,22 @@ class UngDung(tk.Tk):
         w = ttk.Checkbutton(f, text="Giữ trang trắng nằm giữa văn bản (mặc định bỏ đi)", variable=self.v["giu_trang_trang"])
         w.grid(row=11, column=0, columnspan=3, sticky="w", pady=2)
         GoiY(w, "Bật nếu cần giữ đúng số tờ như bản scan (vd scan 2 mặt có mặt sau trắng).")
+
+    def _chon_kieu_sap_xep(self, _e=None):
+        mot, vi_tri, _ = KIEU_SAP_XEP[self.v["kieu_sap_xep"].get()]
+        self.v["mot_van_ban"].set(mot)
+        self.v["vi_tri"].set(vi_tri)
+
+    def _hien_kieu_sap_xep(self):
+        hien = (self.v["mot_van_ban"].get(), self.v["vi_tri"].get())
+        ten = next((k for k, (m, vt, _) in KIEU_SAP_XEP.items() if (m, vt) == hien), "")
+        self.v["kieu_sap_xep"].set(ten)
+        self.lb_kieu.config(text=KIEU_SAP_XEP[ten][2] if ten else "")
+        cham_diem = hien[1] == "Không cố định"
+        self.lb_dau_hieu.config(text=(
+            "Dấu hiệu nhận ra văn bản của đơn vị — dùng để chấm điểm, loại bản sao văn bản cũ lưu lẫn trong hồ sơ:"
+            if cham_diem else
+            "Dấu hiệu đối chiếu — không dùng để chọn văn bản, chỉ báo 'cần kiểm tra' khi nghi lấy nhầm bản sao:"))
 
     def _khung_ocr(self, cha):
         f = ttk.LabelFrame(cha, text="3. Đọc chữ (OCR)", padding=8)
@@ -765,7 +793,7 @@ class UngDung(tk.Tk):
         except (OSError, ValueError):
             return
         for k, gt in d.items():
-            if k in self.v:
+            if k in self.v and k != "kieu_sap_xep":
                 try:
                     self.v[k].set(gt)
                 except tk.TclError:
@@ -824,6 +852,13 @@ def tu_kiem_tra(thu_muc: str) -> int:
         nhat_ky.append(f"Văn bản ở đầu file: C={vb_dau.get('C')}, I={vb_dau.get('I')}, A={vb_dau.get('A')}")
         if vb_dau.get("C") != ("DAT", "1-3") or vb_dau.get("I") != ("DAT", "1-3") or vb_dau.get("A") != ("DAT", "3-6"):
             thieu.append(f"tuỳ chọn văn bản ở đầu file: {vb_dau}")
+        # "Nhiều văn bản xếp liền nhau ở đầu file": giữ các văn bản tới trang hồ sơ rõ ràng đầu tiên
+        kq_nd = tvb.chay_tach(goc / "scan", goc / "ket_qua", dict(cfg, vi_tri="dau", mot_van_ban=False),
+                              so_luong=2, log=lambda s: None)
+        vb_nd = {r["duong_dan"][0]: (r["trang_thai"], r["trang_van_ban"]) for r in kq_nd}
+        nhat_ky.append(f"Nhiều văn bản ở đầu file: I={vb_nd.get('I')}, C={vb_nd.get('C')}, E={vb_nd.get('E')}")
+        if vb_nd.get("I") != ("DAT", "1-3;4-6") or vb_nd.get("C") != ("DAT", "1-3") or vb_nd.get("E") != ("DAT", "2-4"):
+            thieu.append(f"kiểu nhiều văn bản ở đầu file: {vb_nd}")
         dat = len(kq) == 17 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")
