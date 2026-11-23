@@ -177,6 +177,23 @@ def phan_tich_trang(text: str, muc_muc: float, nguong_trang: float) -> dict:
             r = gan("MD", f"tiêu đề '{d[:60]}'")
             r["tieu_de"] = d
             return r
+    # Tiêu đề bị dính chữ bên trái trên cùng dòng (vd con dấu "HỒ SƠ LƯU / Số cc / Ngày: …" đóng cạnh tên hợp
+    # đồng, OCR ghép thành "Ngày: 26-07-2024 HỢP ĐỒNG THẾ CHẤP TÀI SẢN"): trang có Quốc hiệu thì thử bỏ vài chữ
+    # đầu dòng, phần còn lại viết hoa và khớp tên văn bản thì vẫn là trang tiêu đề
+    if quoc_hieu:
+        for d, _ in dau:
+            tu = d.split()
+            for j in range(1, min(len(tu) - 1, 7)):
+                duoi = " ".join(tu[j:])
+                if ty_le_hoa(duoi) < 0.8:
+                    continue
+                b = bo_dau(duoi)
+                if khop_dau(TIEU_DE_HO_SO, b):
+                    break
+                if khop_dau(TIEU_DE_VAN_BAN, b):
+                    r = gan("MD", f"tiêu đề '{duoi[:60]}' (bỏ chữ dính bên trái)")
+                    r["tieu_de"] = duoi
+                    return r
     if dieu >= 1:
         return gan("TH", f"có {dieu} 'Điều …'")
     if so_chu >= CHU_NHIEU:

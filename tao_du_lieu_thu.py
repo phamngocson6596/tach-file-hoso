@@ -84,8 +84,19 @@ LOREM = ("Các bên cam kết những thông tin đã ghi trong hợp đồng n�
          "trong hợp đồng. Mọi tranh chấp phát sinh được giải quyết trên cơ sở thương lượng, hòa giải.")
 
 
-def hd_dau(tieu_de="HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT"):
-    t = Trang(); t.quoc_hieu(); t.giua(tieu_de, FT, 30)
+def hd_dau(tieu_de="HỢP ĐỒNG CHUYỂN NHƯỢNG QUYỀN SỬ DỤNG ĐẤT", dau_luu=False):
+    t = Trang()
+    if dau_luu:  # dấu "HỒ SƠ LƯU / Số cc / Ngày" đóng bên trái, ngang hàng Quốc hiệu và tên hợp đồng
+        for k, s in enumerate(["HỒ SƠ LƯU", "Số cc: 001234", "Ngày: 15/3/2022"]):
+            t.d.text((70, t.y + k * (FB.size + 10) + (40 if k == 2 else 0)), s, font=FB, fill=40)
+    t.quoc_hieu()
+    if dau_luu:
+        w = t.d.textlength(tieu_de, font=FT)
+        x = max((W - w) / 2, 70 + t.d.textlength("Ngày: 15/3/2022", font=FB) + 80)
+        t.d.text((x, t.y), tieu_de, font=FT, fill=20)
+        t.y += FT.size + 30
+    else:
+        t.giua(tieu_de, FT, 30)
     t.doan("Hôm nay, tại Văn phòng công chứng Hòa An, Thành phố Hồ Chí Minh, chúng tôi gồm có:")
     t.doan("BÊN CHUYỂN NHƯỢNG (Bên A): Ông Trần Văn Bình, sinh năm 1970, CCCD số 079070000111.")
     t.doan("BÊN NHẬN CHUYỂN NHƯỢNG (Bên B): Bà Lê Thị Cúc, sinh năm 1985, CCCD số 079185000222.")
@@ -273,7 +284,10 @@ def tao_tat_ca(ra):
     # lời chứng không tính bìa (4 trang) -> bìa để ở phần hồ sơ
     ghi("R_to_bia_khong_tinh.pdf", [phieu_yc(), to_bia(), hd_dau(), hd_giua(), hd_ky(), *loi_chung(so_trang=4),
                                     gcn()], ra)
-    print(f"Đã tạo 17 file thử trong {ra}/")
+    # dấu "HỒ SƠ LƯU / Số cc / Ngày" đóng sát tên hợp đồng: OCR ghép chung một dòng, vẫn phải nhận là trang tiêu đề
+    ghi("S_dau_ho_so_luu_canh_tieu_de.pdf", [hd_dau("HỢP ĐỒNG THẾ CHẤP TÀI SẢN", dau_luu=True), hd_giua(), hd_ky(), *loi_chung(so_trang=4),
+                                             gcn()], ra)
+    print(f"Đã tạo 18 file thử trong {ra}/")
 
 
 if __name__ == "__main__":

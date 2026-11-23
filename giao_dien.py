@@ -836,7 +836,7 @@ def tu_kiem_tra(thu_muc: str) -> int:
         kq = tvb.chay_tach(goc / "scan", goc / "ket_qua", cfg, so_luong=2, log=nhat_ky.append)
         tt = {r["duong_dan"][0]: r["trang_thai"] for r in kq}
         nghi_trang = {r["duong_dan"][0] for r in kq if r.get("nghi_thieu_trang")}
-        mong_doi_dat = {"A", "B", "E", "H", "M", "Q", "R"}
+        mong_doi_dat = {"A", "B", "E", "H", "M", "Q", "R", "S"}
         mong_doi_nghi_trang = {"J", "K", "N", "O", "P"}  # L: chỉ lộ qua số Điều (dấu hiệu yếu) nên chỉ là lưu ý
         loi = [r["duong_dan"] for r in kq if r["trang_thai"] == "LOI"]
         thieu = sorted(k for k in mong_doi_dat if tt.get(k) != "DAT")
@@ -859,7 +859,7 @@ def tu_kiem_tra(thu_muc: str) -> int:
         nhat_ky.append(f"Nhiều văn bản ở đầu file: I={vb_nd.get('I')}, C={vb_nd.get('C')}, E={vb_nd.get('E')}")
         if vb_nd.get("I") != ("DAT", "1-3;4-6") or vb_nd.get("C") != ("DAT", "1-3") or vb_nd.get("E") != ("DAT", "2-4"):
             thieu.append(f"kiểu nhiều văn bản ở đầu file: {vb_nd}")
-        dat = len(kq) == 17 and not loi and not thieu and not sai_trang
+        dat = len(kq) == 18 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")
         # bấm Dừng giữa chừng: phải dừng ngay (không chờ file dở) và vẫn ghi báo cáo
