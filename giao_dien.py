@@ -846,7 +846,7 @@ def tu_kiem_tra(thu_muc: str) -> int:
         nhat_ky.append(f"Nghi thiếu/thừa trang: {sorted(nghi_trang)}")
         vb = {r["duong_dan"][0]: r["trang_van_ban"] for r in kq}
         cb_t = next((r["canh_bao"] for r in kq if r["duong_dan"][0] == "T"), "")
-        if "lạc chỗ ở tr.6" not in cb_t:  # trang scan lạc chỗ phải được chỉ ra
+        if "nằm ngoài văn bản: 6 — văn bản đang thiếu trang" not in cb_t:  # trang scan lạc chỗ phải được chỉ ra
             thieu.append(f"T: không chỉ ra trang scan lạc chỗ ({cb_t[:80]})")
         if vb.get("Q") != "2-6" or vb.get("R") != "3-6":  # tờ bìa: Q gộp vào văn bản, R để ở hồ sơ
             thieu.append(f"tờ bìa: Q={vb.get('Q')} (cần 2-6), R={vb.get('R')} (cần 3-6)")
@@ -868,10 +868,13 @@ def tu_kiem_tra(thu_muc: str) -> int:
                               ("2022/1234.pdf", ("1234", "2022"))):
             if tvb.so_nam_trong_ten(goc_ten) != mong:
                 thieu.append(f"tách số/năm từ tên {goc_ten}: {tvb.so_nam_trong_ten(goc_ten)}")
-        ten_thu = tvb.duong_dan_theo_mau("007552-24.pdf", "0076-{so_cc}-{nam}-VB",
-                                         tvb.gia_tri_ten("007552-24.pdf"), 1)[0]
+        gt = tvb.gia_tri_ten("007552-24.pdf")
+        ten_thu = tvb.duong_dan_theo_mau("007552-24.pdf", "0076-{so_ten}-{nam_ten}-VB", gt, 1)[0]
         if ten_thu != "0076-007552-2024-VB.pdf":
-            thieu.append(f"đặt tên khi không đọc được số CC: {ten_thu}")
+            thieu.append(f"đặt tên theo số/năm trong tên file: {ten_thu}")
+        ten_thu = tvb.duong_dan_theo_mau("007552-24.pdf", "0076-{so_cc}-{nam}-VB", gt, 1)[0]
+        if ten_thu != "007552-24.pdf":  # không đọc được số CC: giữ tên gốc như trước, không tự đoán
+            thieu.append(f"không đọc được số CC mà không giữ tên gốc: {ten_thu}")
         dat = len(kq) == 20 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")

@@ -215,6 +215,9 @@ def _cung_tieu_de(a: str, b: str) -> bool:
     return bool(a and b) and difflib.SequenceMatcher(None, " ".join(a), " ".join(b)).ratio() >= 0.75
 
 
+CB_DIEU_NGOAI = "trang có nhiều 'Điều…' nằm ngoài văn bản: "
+
+
 def chia_van_ban(trang: list[dict], can_quoc_hieu: bool = True) -> tuple[list[dict], list[str]]:
     """Trả về (danh sách văn bản tìm được, cảnh báo cấp file).
     Mỗi văn bản: dict(trang=[chỉ số 0-based], co_md, co_lc, quoc_hieu, canh_bao=[])."""
@@ -300,11 +303,11 @@ def chia_van_ban(trang: list[dict], can_quoc_hieu: bool = True) -> tuple[list[di
         hien["canh_bao"].append("không tìm thấy trang LỜI CHỨNG")
         chot(hien)
 
-    # trang nội dung có nhiều "Điều…" nằm ngoài mọi văn bản: trang văn bản scan lạc chỗ, hoặc hợp đồng khác trong
-    # hồ sơ — xu_ly_file quyết định có cần báo hay không (dựa vào số trang lời chứng)
-    for d in doan:
-        d["ngoai_dieu"] = [k for k in range(n) if k not in da_dung and trang[k]["nhan"] == "TH" and trang[k]["dieu"] >= 2]
-    return doan, []
+    canh_bao_file = []
+    ngoai = [k + 1 for k in range(n) if k not in da_dung and trang[k]["nhan"] == "TH" and trang[k]["dieu"] >= 2]
+    if ngoai:
+        canh_bao_file.append(f"{CB_DIEU_NGOAI}{', '.join(map(str, ngoai))}")
+    return doan, canh_bao_file
 
 
 # ---------- Chọn VĂN BẢN CHÍNH khi 1 file có nhiều văn bản (vd hồ sơ lưu kèm bản sao HĐ cũ) ----------
@@ -961,13 +964,13 @@ def so_nam_trong_ten(rel: str) -> tuple[str, str]:
 
 
 def gia_tri_ten(rel: str, so_cc: str = "", ngay=None, loai: str = "", stt: int = 1) -> dict:
-    """Giá trị các trường mẫu tên. Không đọc được số CC / năm từ lời chứng thì lấy số / năm trong tên file gốc."""
+    """Giá trị các trường mẫu tên. {so_ten}, {nam_ten} lấy từ tên file gốc (chỉ dùng khi mẫu ghi rõ)."""
     y, m, d = ngay if ngay else (0, 0, 0)
     loai = re.sub(r"\s+", "_", bo_dau(loai))
     if len(loai) > 40:
         loai = loai[:40].rsplit("_", 1)[0]
     so_ten, nam_ten = so_nam_trong_ten(rel)
-    return dict(ten=Path(rel).stem, so_cc=so_cc or so_ten, nam=str(y) if y else nam_ten,
+    return dict(ten=Path(rel).stem, so_cc=so_cc or "", nam=str(y) if y else "",
                 so_ten=so_ten, nam_ten=nam_ten,
                 ngay=f"{y:04d}-{m:02d}-{d:02d}" if (y and m and d) else "", loai=loai, stt=str(stt))
 
@@ -1194,21 +1197,18 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
             thong_tin += [tien_to + x for x in dat]
             thong_tin += [f"{tien_to}lưu ý số trang (chưa chắc): {x}" for x in luu_y]
         canh_bao += ["số trang: " + x for x in nghi_thieu]
-        # trang có nhiều "Điều…" nằm ngoài văn bản: chỉ đáng báo khi văn bản thiếu trang (có thể là trang scan lạc
-        # chỗ) hoặc không biết số trang; lời chứng khớp đủ trang thì đó là hợp đồng khác trong hồ sơ -> ghi chú
-        ngoai = sorted(set(doan[0].get("ngoai_dieu", [])) - {i for d in doan for i in d["trang"]}) if doan else []
-        if ngoai:
-            ds = ", ".join(str(i + 1) for i in ngoai)
-            thieu = any("(thiếu " in x for x in nghi_thieu)
-            du = any("trang theo lời chứng" in x and x.split(": ")[-1].startswith("đủ") for x in thong_tin)
+        # Cảnh báo "trang có nhiều 'Điều…' nằm ngoài văn bản" giữ như cũ, chỉ đổi ở 2 trường hợp chắc chắn:
+        # - văn bản thiếu trang theo lời chứng: thêm gợi ý đó có thể là trang bị scan lạc chỗ;
+        # - chế độ 1 văn bản và lời chứng khớp đủ trang: văn bản đã đủ, trang đó là của hợp đồng khác trong hồ sơ
+        #   -> chuyển thành ghi chú (chế độ nhiều văn bản vẫn báo: có thể là một văn bản khác bị sót)
+        for x in [c for c in canh_bao if c.startswith(CB_DIEU_NGOAI)]:
+            thieu = any("(thiếu " in y for y in nghi_thieu)
+            du = len(doan) == 1 and any(y.startswith("đủ ") and y.endswith("trang theo lời chứng") for y in thong_tin)
             if thieu:
-                canh_bao.append(f"văn bản thiếu trang — có thể bị scan lạc chỗ ở tr.{ds} (trang nội dung có "
-                                "'Điều…' nằm ngoài văn bản): mở xem, đúng thì thêm vào cột trang_van_ban")
-            elif du:
-                thong_tin.append(f"tr.{ds} ngoài văn bản có nhiều 'Điều…' (hợp đồng khác trong hồ sơ)")
-            else:
-                canh_bao.append(f"tr.{ds} nằm ngoài văn bản nhưng giống trang nội dung hợp đồng (có nhiều "
-                                "'Điều…'): trang văn bản scan lạc chỗ, hay hợp đồng khác trong hồ sơ? — cần xem lại")
+                canh_bao[canh_bao.index(x)] = x + " — văn bản đang thiếu trang, có thể là trang bị scan lạc chỗ"
+            elif du and cfg["mot_van_ban"]:
+                canh_bao.remove(x)
+                thong_tin.append(x + " (văn bản đã đủ trang theo lời chứng: hợp đồng khác trong hồ sơ)")
         so_trang_trang = sum(t["nhan"] == "TT" and "trung" not in t for t in trang)
         if so_trang_trang:
             thong_tin.append(f"{so_trang_trang} trang trắng")
