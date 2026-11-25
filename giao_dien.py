@@ -56,7 +56,8 @@ KIEU_SAP_XEP = {
         "Văn bản và hồ sơ xen kẽ (VB1, hồ sơ 1, VB2…): chấm điểm theo các dấu hiệu bên dưới, giữ văn bản của đơn "
         "vị, loại bản sao văn bản cũ lưu trong hồ sơ."),
 }
-MAU_VB = ["{ten}", "{ten}_VB", "{nam}_{so_cc}", "{nam}_{so_cc}_{loai}", "{so_cc}_{loai}", "{ngay}_{so_cc}"]
+MAU_VB = ["{ten}", "{ten}_VB", "{so_ten}-{nam_ten}", "{nam}_{so_cc}", "{nam}_{so_cc}_{loai}", "{so_cc}_{loai}",
+          "{ngay}_{so_cc}"]
 MAU_HS = ["{ten}", "{ten}_HS", "{nam}_{so_cc}_HS", "{so_cc}_HS"]
 NHAN_TT = {"DAT": ("Đạt", "#15803d"), "CAN_KIEM_TRA": ("Cần kiểm tra", "#b45309"),
            "KHONG_THAY": ("Không thấy", "#b91c1c"), "LOI": ("Lỗi", "#7f1d1d")}
@@ -435,14 +436,14 @@ class UngDung(tk.Tk):
         if not hasattr(self, "lb_vi_du"):
             return
         tvb = self.tvb
-        gt = tvb.gia_tri_ten("2023_027529.pdf", "027529", (2023, 11, 30), "GIẤY ỦY QUYỀN", 1)
+        gt = tvb.gia_tri_ten("027529-23.pdf", "027529", (2023, 11, 30), "GIẤY ỦY QUYỀN", 1)
         loi = tvb.kiem_tra_mau_ten(self.v["mau_ten_vb"].get()) or (
             tvb.kiem_tra_mau_ten(self.v["mau_ten_hs"].get()) and "Tên hồ sơ: " + tvb.kiem_tra_mau_ten(self.v["mau_ten_hs"].get()))
         if loi:
             self.lb_vi_du.configure(text="✖ " + loi, foreground="#b91c1c")
             return
-        vb, _ = tvb.duong_dan_theo_mau("2023_027529.pdf", self.v["mau_ten_vb"].get(), gt, 1)
-        self.lb_vi_du.configure(text=f"Ví dụ: 2023_027529.pdf → {vb}", foreground="#6b7280")
+        vb, _ = tvb.duong_dan_theo_mau("027529-23.pdf", self.v["mau_ten_vb"].get(), gt, 1)
+        self.lb_vi_du.configure(text=f"Ví dụ: 027529-23.pdf → {vb}", foreground="#6b7280")
 
     # ------------------------------------------------------------------ thao tác
     def chon_vao(self):
@@ -862,6 +863,15 @@ def tu_kiem_tra(thu_muc: str) -> int:
         nhat_ky.append(f"Nhiều văn bản ở đầu file: I={vb_nd.get('I')}, C={vb_nd.get('C')}, E={vb_nd.get('E')}")
         if vb_nd.get("I") != ("DAT", "1-3;4-6") or vb_nd.get("C") != ("DAT", "1-3") or vb_nd.get("E") != ("DAT", "2-4"):
             thieu.append(f"kiểu nhiều văn bản ở đầu file: {vb_nd}")
+        # đặt tên theo số / năm trong tên file gốc (không phụ thuộc OCR)
+        for goc_ten, mong in (("007552-24.pdf", ("007552", "2024")), ("2023_027529.pdf", ("027529", "2023")),
+                              ("2022/1234.pdf", ("1234", "2022"))):
+            if tvb.so_nam_trong_ten(goc_ten) != mong:
+                thieu.append(f"tách số/năm từ tên {goc_ten}: {tvb.so_nam_trong_ten(goc_ten)}")
+        ten_thu = tvb.duong_dan_theo_mau("007552-24.pdf", "0076-{so_cc}-{nam}-VB",
+                                         tvb.gia_tri_ten("007552-24.pdf"), 1)[0]
+        if ten_thu != "0076-007552-2024-VB.pdf":
+            thieu.append(f"đặt tên khi không đọc được số CC: {ten_thu}")
         dat = len(kq) == 20 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")

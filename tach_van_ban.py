@@ -922,6 +922,8 @@ TRUONG_TEN = {
     "ten": "tên file gốc",
     "so_cc": "số công chứng",
     "nam": "năm công chứng",
+    "so_ten": "số trong tên file gốc",
+    "nam_ten": "năm trong tên file gốc (24 → 2024)",
     "ngay": "ngày công chứng (năm-tháng-ngày)",
     "loai": "loại văn bản (tiêu đề, không dấu)",
     "stt": "số thứ tự văn bản trong file",
@@ -941,12 +943,32 @@ def so_cc_de_dat_ten(so_tho: list[str], so_cc: set[str], rel: str) -> str:
     return min(so_tho, key=len) if so_tho else ""
 
 
+def so_nam_trong_ten(rel: str) -> tuple[str, str]:
+    """Tách số công chứng và năm từ tên file gốc, giữ nguyên số 0 ở đầu:
+    007552-24 -> (007552, 2024); 2023_027529 -> (027529, 2023); 0001-24 -> (0001, 2024)."""
+    nhom = re.findall(r"\d+", Path(rel).stem)
+    la_nam = lambda x: (len(x) == 4 and 1990 <= int(x) <= 2099) or len(x) == 2  # noqa: E731
+    nam_ung = [x for x in nhom if la_nam(x)]
+    so_ung = [x for x in nhom if 3 <= len(x) <= 8]
+    so = next((x for x in so_ung if not (len(x) == 4 and la_nam(x)) or len(so_ung) == 1), "")
+    nam = next((x for x in reversed(nam_ung) if x != so), "")
+    if not nam:  # năm ở tên thư mục, vd 2022/1234.pdf
+        nam = next((x for thu_muc in reversed(Path(rel).parts[:-1]) for x in re.findall(r"\d{4}", thu_muc)
+                    if 1990 <= int(x) <= 2099), "")
+    if len(nam) == 2:
+        nam = ("20" if int(nam) <= time.localtime().tm_year % 100 + 1 else "19") + nam
+    return so, nam
+
+
 def gia_tri_ten(rel: str, so_cc: str = "", ngay=None, loai: str = "", stt: int = 1) -> dict:
+    """Giá trị các trường mẫu tên. Không đọc được số CC / năm từ lời chứng thì lấy số / năm trong tên file gốc."""
     y, m, d = ngay if ngay else (0, 0, 0)
     loai = re.sub(r"\s+", "_", bo_dau(loai))
     if len(loai) > 40:
         loai = loai[:40].rsplit("_", 1)[0]
-    return dict(ten=Path(rel).stem, so_cc=so_cc or "", nam=str(y) if y else "",
+    so_ten, nam_ten = so_nam_trong_ten(rel)
+    return dict(ten=Path(rel).stem, so_cc=so_cc or so_ten, nam=str(y) if y else nam_ten,
+                so_ten=so_ten, nam_ten=nam_ten,
                 ngay=f"{y:04d}-{m:02d}-{d:02d}" if (y and m and d) else "", loai=loai, stt=str(stt))
 
 

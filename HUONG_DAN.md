@@ -168,16 +168,20 @@ KetQua/
 | `{ten}` | tên file gốc | `2023_027529` |
 | `{so_cc}` | số công chứng trong lời chứng. Nếu khớp với số trong tên file thì lấy theo tên file, để tránh OCR đọc sai | `027529` |
 | `{nam}` | năm công chứng | `2023` |
+| `{so_ten}` | số trong tên file gốc, giữ số 0 ở đầu | `007552` (từ `007552-24.pdf`) |
+| `{nam_ten}` | năm trong tên file gốc (hoặc tên thư mục); năm 2 chữ số được viết đủ | `2024` (từ `007552-24.pdf`) |
 | `{ngay}` | ngày công chứng | `2023-11-30` |
 | `{loai}` | tiêu đề văn bản, không dấu | `GIAY_UY_QUYEN` |
 | `{stt}` | số thứ tự văn bản trong file (khi một file có nhiều văn bản) | `1` |
 
-Ví dụ: mẫu `{nam}_{so_cc}_{loai}` cho ra `2023_027529_GIAY_UY_QUYEN.pdf`.
+Ví dụ: mẫu `{nam}_{so_cc}_{loai}` cho ra `2023_027529_GIAY_UY_QUYEN.pdf`. File gốc đặt tên theo số công chứng (vd `007552-24.pdf`) thì mẫu `0076-{so_ten}-{nam_ten}-VB` cho ra `0076-007552-2024-VB.pdf` mà không phụ thuộc OCR.
+
+- Không đọc được số công chứng hoặc năm từ lời chứng thì `{so_cc}`, `{nam}` lấy số và năm trong tên file gốc.
 
 - Giữ nguyên cấu trúc thư mục con như bản gốc.
 - **Trùng tên** thì tự thêm `(2)`, `(3)`…
 - File có nhiều văn bản mà mẫu không có `{stt}` thì tự thêm `__vb1`, `__vb2`.
-- Văn bản nào **thiếu dữ liệu** cho mẫu (ví dụ không đọc được số công chứng) thì **giữ tên gốc**. Bảng Excel có các cột `so_cong_chung`, `ngay_cong_chung`, `loai_van_ban` và `file_van_ban`. Bạn điền hoặc sửa các cột này, rồi bấm **Cắt bản chốt**: tên file sẽ được đặt lại theo đúng giá trị đã sửa.
+- Văn bản nào vẫn **thiếu dữ liệu** cho mẫu (ví dụ không đọc được loại văn bản) thì **giữ tên gốc**. Bảng Excel có các cột `so_cong_chung`, `ngay_cong_chung`, `loai_van_ban` và `file_van_ban`. Bạn điền hoặc sửa các cột này, rồi bấm **Cắt bản chốt**: tên file sẽ được đặt lại theo đúng giá trị đã sửa.
 - Nếu chọn **Xuất thêm phần hồ sơ còn lại**, khi cắt bản chốt phần hồ sơ được ghi vào thư mục **`chot_ho_so`**, cạnh thư mục `chot`.
 - Ô **Bỏ trang trắng khỏi phần hồ sơ** được bật sẵn. Ô này áp dụng cả khi tách lẫn khi cắt bản chốt; trang trắng được nhận ra từ kết quả đọc chữ đã lưu, nên không phải đọc lại. Văn bản công chứng thì mặc định đã bỏ trang trắng.
 
