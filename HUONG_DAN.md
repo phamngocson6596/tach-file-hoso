@@ -161,20 +161,48 @@ KetQua/
 
 ### Đặt tên file kết quả
 
-Ở mục **4. Đầu ra**, ô **Tên file văn bản** và **tên file hồ sơ** nhận một *mẫu tên*. Bạn chọn mẫu có sẵn hoặc gõ tự do; ngay dưới ô có dòng ví dụ để xem trước.
+Ở mục **4. Đầu ra**, chọn **Đặt tên theo**:
+
+- **Tên file gốc** — khuyên dùng khi đơn vị đặt tên file scan có quy luật (vd `007552-24.pdf`: số công chứng – năm). Tên mới lấy số và năm **từ tên file gốc, không dựa vào OCR**: cùng tên gốc thì luôn ra cùng tên mới.
+- **Nội dung đọc được (OCR)** — mặc định, như các bản trước: số, ngày, loại văn bản đọc từ lời chứng.
+
+#### Đặt tên theo tên file gốc
+
+1. Ô **Dạng tên gốc**: ghi tên file gốc trông thế nào, bằng các trường:
+
+   | Trường | Nghĩa |
+   |---|---|
+   | `{so_cc}` | số công chứng (dãy số, giữ số 0 ở đầu) |
+   | `{nam}` | năm, 2 hoặc 4 chữ số; năm 2 chữ số được viết đủ (`24` → `2024`) |
+   | `{bo_qua}` | đoạn chữ không dùng tới |
+
+   Ký tự khác (`-`, `_`, khoảng trắng…) phải khớp đúng. Có `/` thì khớp cả tên thư mục. Ví dụ:
+
+   | Tên file gốc | Dạng tên gốc |
+   |---|---|
+   | `007552-24.pdf` | `{so_cc}-{nam}` |
+   | `2023_027529.pdf` | `{nam}_{so_cc}` |
+   | `2022/1234.pdf` (năm là tên thư mục) | `{nam}/{so_cc}` |
+   | `HS 007552 Nguyen Van A.pdf` | `HS {so_cc}{bo_qua}` |
+
+2. Ô **Tên file văn bản / hồ sơ**: mẫu tên mới, chỉ dùng `{so_cc}`, `{nam}` (có trong dạng tên gốc), `{ten}`, `{stt}`. Vd `0076-{so_cc}-{nam}-VB` cho ra `0076-007552-2024-VB.pdf`.
+3. Ngay dưới ô có dòng ví dụ lấy từ file thật trong thư mục đầu vào, và số file **đúng dạng** (vd `⚠ 48/50 file … không đúng: 007555-24 (1).pdf…`). Sửa dạng khai báo hoặc sửa tên file trước khi chạy.
+4. File **không đúng dạng** thì giữ tên gốc và được báo **cần kiểm tra**. Muốn đổi tên, sửa cột `file_van_ban` trong bảng Excel rồi bấm **Cắt bản chốt** (ở chế độ này, cột `file_van_ban` được dùng làm tên khi cắt bản chốt).
+
+#### Đặt tên theo nội dung đọc được (OCR)
+
+Ô **Tên file văn bản** và **tên file hồ sơ** nhận một *mẫu tên*. Bạn chọn mẫu có sẵn hoặc gõ tự do; ngay dưới ô có dòng ví dụ để xem trước.
 
 | Trường | Lấy từ | Ví dụ |
 |---|---|---|
 | `{ten}` | tên file gốc | `2023_027529` |
 | `{so_cc}` | số công chứng trong lời chứng. Nếu khớp với số trong tên file thì lấy theo tên file, để tránh OCR đọc sai | `027529` |
 | `{nam}` | năm công chứng | `2023` |
-| `{so_ten}` | số trong tên file gốc, giữ số 0 ở đầu | `007552` (từ `007552-24.pdf`) |
-| `{nam_ten}` | năm trong tên file gốc (hoặc tên thư mục); năm 2 chữ số được viết đủ | `2024` (từ `007552-24.pdf`) |
 | `{ngay}` | ngày công chứng | `2023-11-30` |
 | `{loai}` | tiêu đề văn bản, không dấu | `GIAY_UY_QUYEN` |
 | `{stt}` | số thứ tự văn bản trong file (khi một file có nhiều văn bản) | `1` |
 
-Ví dụ: mẫu `{nam}_{so_cc}_{loai}` cho ra `2023_027529_GIAY_UY_QUYEN.pdf`. File gốc đặt tên theo số công chứng (vd `007552-24.pdf`) thì mẫu `0076-{so_ten}-{nam_ten}-VB` cho ra `0076-007552-2024-VB.pdf` mà không phụ thuộc OCR.
+Ví dụ: mẫu `{nam}_{so_cc}_{loai}` cho ra `2023_027529_GIAY_UY_QUYEN.pdf`.
 
 - Giữ nguyên cấu trúc thư mục con như bản gốc.
 - **Trùng tên** thì tự thêm `(2)`, `(3)`…

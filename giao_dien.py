@@ -56,8 +56,8 @@ KIEU_SAP_XEP = {
         "Văn bản và hồ sơ xen kẽ (VB1, hồ sơ 1, VB2…): chấm điểm theo các dấu hiệu bên dưới, giữ văn bản của đơn "
         "vị, loại bản sao văn bản cũ lưu trong hồ sơ."),
 }
-MAU_VB = ["{ten}", "{ten}_VB", "{so_ten}-{nam_ten}", "{nam}_{so_cc}", "{nam}_{so_cc}_{loai}", "{so_cc}_{loai}",
-          "{ngay}_{so_cc}"]
+MAU_VB = ["{ten}", "{ten}_VB", "{nam}_{so_cc}", "{nam}_{so_cc}_{loai}", "{so_cc}_{loai}", "{ngay}_{so_cc}"]
+DANG_TEN_GOC = ["{so_cc}-{nam}", "{so_cc}_{nam}", "{nam}_{so_cc}", "{nam}-{so_cc}", "{nam}/{so_cc}", "{so_cc}"]
 MAU_HS = ["{ten}", "{ten}_HS", "{nam}_{so_cc}_HS", "{so_cc}_HS"]
 NHAN_TT = {"DAT": ("Đạt", "#15803d"), "CAN_KIEM_TRA": ("Cần kiểm tra", "#b45309"),
            "KHONG_THAY": ("Không thấy", "#b91c1c"), "LOI": ("Lỗi", "#7f1d1d")}
@@ -154,6 +154,8 @@ class UngDung(tk.Tk):
             kiem_tra_cap_nhat=tk.BooleanVar(value=True),
             mau_ten_vb=tk.StringVar(value=md["mau_ten_vb"]),
             mau_ten_hs=tk.StringVar(value=md["mau_ten_hs"]),
+            dat_ten_theo=tk.StringVar(value=md["dat_ten_theo"]),
+            dang_ten_goc=tk.StringVar(value=md["dang_ten_goc"]),
             bo_trang_trang_ho_so=tk.BooleanVar(value=md["bo_trang_trang_ho_so"]),
         )
 
@@ -344,36 +346,58 @@ class UngDung(tk.Tk):
                      + "\n\nVăn bản nào thiếu số/ngày/loại (OCR không đọc được) sẽ giữ tên gốc; điền tay vào cột "
                        "so_cong_chung / ngay_cong_chung / loai_van_ban trong bảng Excel rồi cắt bản chốt để đặt lại. "
                        "Trùng tên thì tự thêm (2), (3)…")
-        ttk.Label(f, text="Tên file văn bản:").grid(row=0, column=0, sticky="w")
-        w = ttk.Combobox(f, textvariable=self.v["mau_ten_vb"], values=MAU_VB)
-        w.grid(row=0, column=1, columnspan=2, sticky="ew", padx=(4, 0))
-        GoiY(w, goi_y_ten)
-        self.lb_vi_du = ttk.Label(f, text="", style="Goiy.TLabel")
-        self.lb_vi_du.grid(row=1, column=1, columnspan=2, sticky="w", padx=(4, 0))
+        ttk.Label(f, text="Đặt tên theo:").grid(row=0, column=0, sticky="w")
         r = ttk.Frame(f)
-        r.grid(row=2, column=0, columnspan=3, sticky="ew", pady=(2, 0))
+        r.grid(row=0, column=1, columnspan=2, sticky="w", padx=(4, 0))
+        for nhan, gt, goi_y in (
+                ("Tên file gốc", "ten_goc",
+                 "Khai báo dạng tên file gốc, vd {so_cc}-{nam} cho 007552-24.pdf. Tên mới lấy số và năm từ tên gốc, "
+                 "không dựa vào OCR: cùng tên gốc thì luôn ra cùng tên mới. File không đúng dạng thì giữ tên gốc "
+                 "và được báo cần kiểm tra."),
+                ("Nội dung đọc được (OCR)", "ocr",
+                 "Số công chứng, ngày, loại văn bản đọc từ lời chứng. Văn bản nào không đọc được thì giữ tên gốc.")):
+            w = ttk.Radiobutton(r, text=nhan, variable=self.v["dat_ten_theo"], value=gt)
+            w.pack(side="left", padx=(0, 12))
+            GoiY(w, goi_y)
+        self.lb_dang = ttk.Label(f, text="Dạng tên gốc:")
+        self.lb_dang.grid(row=1, column=0, sticky="w")
+        self.cb_dang = ttk.Combobox(f, textvariable=self.v["dang_ten_goc"], values=DANG_TEN_GOC)
+        self.cb_dang.grid(row=1, column=1, columnspan=2, sticky="ew", padx=(4, 0), pady=2)
+        GoiY(self.cb_dang, "Tên file gốc trông thế nào, ghi bằng các trường:\n"
+             + "\n".join(f"{{{k}}}  {v}" for k, v in self.tvb.TRUONG_DANG_TEN_GOC.items())
+             + "\nKý tự khác (- _ khoảng trắng) phải khớp đúng. Có / thì khớp cả tên thư mục, vd {nam}/{so_cc} "
+               "cho 2022/1234.pdf.\nVí dụ: {so_cc}-{nam} → 007552-24.pdf · {nam}_{so_cc} → 2023_027529.pdf · "
+               "HS {so_cc}{bo_qua} → HS 007552 Nguyen Van A.pdf")
+        ttk.Label(f, text="Tên file văn bản:").grid(row=2, column=0, sticky="w")
+        w = ttk.Combobox(f, textvariable=self.v["mau_ten_vb"], values=MAU_VB)
+        w.grid(row=2, column=1, columnspan=2, sticky="ew", padx=(4, 0))
+        GoiY(w, goi_y_ten)
+        self.lb_vi_du = ttk.Label(f, text="", style="Goiy.TLabel", wraplength=470, justify="left")
+        self.lb_vi_du.grid(row=3, column=1, columnspan=2, sticky="w", padx=(4, 0))
+        r = ttk.Frame(f)
+        r.grid(row=4, column=0, columnspan=3, sticky="ew", pady=(2, 0))
         ttk.Checkbutton(r, text="Xuất thêm phần hồ sơ còn lại, tên:", variable=self.v["xuat_ho_so"]).pack(side="left")
         w = ttk.Combobox(r, textvariable=self.v["mau_ten_hs"], values=MAU_HS, width=18)
         w.pack(side="left", padx=4, fill="x", expand=True)
         GoiY(w, goi_y_ten + "\n\nFile hồ sơ nằm trong thư mục ho_so (khi tách) và chot_ho_so (khi cắt bản chốt).")
         w = ttk.Checkbutton(f, text="Bỏ trang trắng khỏi phần hồ sơ", variable=self.v["bo_trang_trang_ho_so"])
-        w.grid(row=3, column=0, columnspan=3, sticky="w", padx=(22, 0))
+        w.grid(row=5, column=0, columnspan=3, sticky="w", padx=(22, 0))
         GoiY(w, "Áp dụng cho phần hồ sơ khi tách và khi cắt bản chốt. Văn bản công chứng thì mặc định đã bỏ trang "
                 "trắng (muốn giữ thì tick 'Giữ trang trắng nằm giữa văn bản' ở mục 2).")
-        for k in ("mau_ten_vb", "mau_ten_hs"):
+        for k in ("mau_ten_vb", "mau_ten_hs", "dat_ten_theo", "dang_ten_goc"):
             self.v[k].trace_add("write", lambda *_: self._cap_nhat_vi_du())
         ttk.Checkbutton(f, text="Ảnh thu nhỏ cho cả file đạt (để soát kỹ khi chạy thử)", variable=self.v["xem_tat_ca"]) \
-            .grid(row=4, column=0, columnspan=3, sticky="w")
+            .grid(row=6, column=0, columnspan=3, sticky="w")
         w = ttk.Checkbutton(f, text="Lưu chữ OCR để dò lỗi (thư mục chu_ocr — có dữ liệu cá nhân)",
                             variable=self.v["luu_chu"])
-        w.grid(row=5, column=0, columnspan=3, sticky="w")
+        w.grid(row=7, column=0, columnspan=3, sticky="w")
         r = ttk.Frame(f)
-        r.grid(row=6, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        r.grid(row=8, column=0, columnspan=3, sticky="w", pady=(4, 0))
         ttk.Label(r, text="Chỉ chạy thử").pack(side="left")
         ttk.Spinbox(r, from_=0, to=100000, textvariable=self.v["gioi_han"], width=7).pack(side="left", padx=4)
         ttk.Label(r, text="file đầu tiên (0 = tất cả)", style="Goiy.TLabel").pack(side="left")
         w = ttk.Checkbutton(f, text="Tự kiểm tra bản mới khi mở phần mềm", variable=self.v["kiem_tra_cap_nhat"])
-        w.grid(row=7, column=0, columnspan=3, sticky="w", pady=(4, 0))
+        w.grid(row=9, column=0, columnspan=3, sticky="w", pady=(4, 0))
         self._cap_nhat_vi_du()
         GoiY(w, "Khi mở, phần mềm hỏi GitHub số phiên bản mới nhất để báo nếu có bản mới. "
                 "Chỉ gửi đúng yêu cầu này, không gửi bất kỳ dữ liệu hồ sơ nào. Bỏ tick nếu muốn phần mềm "
@@ -432,20 +456,44 @@ class UngDung(tk.Tk):
         self.nut_chot.pack(anchor="w", pady=(6, 0))
 
     def _cap_nhat_vi_du(self):
-        """Xem trước tên file với một văn bản mẫu."""
+        """Xem trước tên file; đặt tên theo tên gốc thì thử luôn dạng tên gốc trên các file trong thư mục đầu vào."""
         if not hasattr(self, "lb_vi_du"):
             return
         tvb = self.tvb
-        gt = tvb.gia_tri_ten("027529-23.pdf", "027529", (2023, 11, 30), "GIẤY ỦY QUYỀN", 1)
-        loi = tvb.kiem_tra_mau_ten(self.v["mau_ten_vb"].get()) or (
-            tvb.kiem_tra_mau_ten(self.v["mau_ten_hs"].get()) and "Tên hồ sơ: " + tvb.kiem_tra_mau_ten(self.v["mau_ten_hs"].get()))
+        theo_goc = self.v["dat_ten_theo"].get() == "ten_goc"
+        self.cb_dang.configure(state="normal" if theo_goc else "disabled")
+        mau_vb, mau_hs = self.v["mau_ten_vb"].get(), self.v["mau_ten_hs"].get()
+        if theo_goc:
+            dang = self.v["dang_ten_goc"].get()
+            loi = tvb.kiem_tra_dang_ten_goc(dang) or tvb.kiem_tra_mau_theo_ten_goc(mau_vb, dang) or (
+                tvb.kiem_tra_mau_theo_ten_goc(mau_hs, dang) and "Tên hồ sơ: " + tvb.kiem_tra_mau_theo_ten_goc(mau_hs, dang))
+        else:
+            loi = tvb.kiem_tra_mau_ten(mau_vb) or (
+                tvb.kiem_tra_mau_ten(mau_hs) and "Tên hồ sơ: " + tvb.kiem_tra_mau_ten(mau_hs))
         if loi:
             self.lb_vi_du.configure(text="✖ " + loi, foreground="#b91c1c")
             return
-        vb, _ = tvb.duong_dan_theo_mau("027529-23.pdf", self.v["mau_ten_vb"].get(), gt, 1)
-        self.lb_vi_du.configure(text=f"Ví dụ: 027529-23.pdf → {vb}", foreground="#6b7280")
+        if not theo_goc:
+            gt = tvb.gia_tri_ten("027529-23.pdf", "027529", (2023, 11, 30), "GIẤY ỦY QUYỀN", 1)
+            vb, _ = tvb.duong_dan_theo_mau("027529-23.pdf", mau_vb, gt, 1)
+            self.lb_vi_du.configure(text=f"Ví dụ: 027529-23.pdf → {vb}", foreground="#6b7280")
+            return
+        ds = getattr(self, "ds_rel", None) or []
+        khop = [r for r in ds if tvb.tach_ten_goc(r, dang)]
+        mau = khop[0] if khop else (ds[0] if ds else "007552-24.pdf")
+        gt = tvb.gia_tri_ten_theo_goc(mau, dang)
+        if gt:
+            vb, _ = tvb.duong_dan_theo_mau(mau, mau_vb, gt, 1)
+            chu = f"Ví dụ: {mau} → {vb}"
+        else:
+            chu = f"Ví dụ: {mau} không đúng dạng {dang}"
+        if ds:
+            sai = [r for r in ds if r not in set(khop)]
+            chu += f"\n{'✔' if not sai else '⚠'} {len(khop)}/{len(ds)} file trong thư mục đầu vào đúng dạng tên gốc"
+            if sai:
+                chu += " · không đúng: " + ", ".join(sai[:3]) + (f" và {len(sai) - 3} file khác" if len(sai) > 3 else "")
+        self.lb_vi_du.configure(text=chu, foreground="#b45309" if (not gt or (ds and len(khop) < len(ds))) else "#6b7280")
 
-    # ------------------------------------------------------------------ thao tác
     def chon_vao(self):
         d = filedialog.askdirectory(title="Chọn thư mục chứa PDF scan", initialdir=self.v["vao"].get() or None)
         if d:
@@ -471,8 +519,9 @@ class UngDung(tk.Tk):
 
         def dem():
             try:
-                n = len(self.tvb.liet_ke_pdf(vao, ra))
-                self.q.put(("dem", f"Tìm thấy {n} file PDF"))
+                ds = self.tvb.liet_ke_pdf(vao, ra)
+                self.q.put(("ds_file", [rel for _, rel in ds]))
+                self.q.put(("dem", f"Tìm thấy {len(ds)} file PDF"))
             except Exception as e:
                 self.q.put(("dem", f"Không đọc được thư mục: {e}"))
 
@@ -492,6 +541,7 @@ class UngDung(tk.Tk):
             bo_trang_trang_ho_so=v["bo_trang_trang_ho_so"].get(),
             luu_chu=v["luu_chu"].get(),
             mau_ten_vb=v["mau_ten_vb"].get().strip() or "{ten}", mau_ten_hs=v["mau_ten_hs"].get().strip() or "{ten}",
+            dat_ten_theo=v["dat_ten_theo"].get(), dang_ten_goc=v["dang_ten_goc"].get().strip(),
         )
         return cfg
 
@@ -658,8 +708,14 @@ class UngDung(tk.Tk):
         self.luong.start()
 
     def _mau_ten_hop_le(self) -> bool:
+        theo_goc = self.v["dat_ten_theo"].get() == "ten_goc"
+        dang = self.v["dang_ten_goc"].get().strip()
+        if theo_goc and self.tvb.kiem_tra_dang_ten_goc(dang):
+            messagebox.showwarning("Dạng tên gốc chưa đúng", self.tvb.kiem_tra_dang_ten_goc(dang))
+            return False
         for nhan, k in (("Tên file văn bản", "mau_ten_vb"), ("Tên file hồ sơ", "mau_ten_hs")):
-            loi = self.tvb.kiem_tra_mau_ten(self.v[k].get().strip() or "{ten}")
+            mau = self.v[k].get().strip() or "{ten}"
+            loi = self.tvb.kiem_tra_mau_theo_ten_goc(mau, dang) if theo_goc else self.tvb.kiem_tra_mau_ten(mau)
             if loi:
                 messagebox.showwarning("Mẫu tên chưa đúng", f"{nhan}: {loi}")
                 return False
@@ -710,6 +766,9 @@ class UngDung(tk.Tk):
                     self._ghi(gt)
                 elif loai == "dem":
                     self.lb_dem.configure(text=gt)
+                elif loai == "ds_file":
+                    self.ds_rel = gt
+                    self._cap_nhat_vi_du()
                 elif loai == "tien_do":
                     k, n, tt, thieu = gt
                     if thieu:
@@ -863,18 +922,23 @@ def tu_kiem_tra(thu_muc: str) -> int:
         nhat_ky.append(f"Nhiều văn bản ở đầu file: I={vb_nd.get('I')}, C={vb_nd.get('C')}, E={vb_nd.get('E')}")
         if vb_nd.get("I") != ("DAT", "1-3;4-6") or vb_nd.get("C") != ("DAT", "1-3") or vb_nd.get("E") != ("DAT", "2-4"):
             thieu.append(f"kiểu nhiều văn bản ở đầu file: {vb_nd}")
-        # đặt tên theo số / năm trong tên file gốc (không phụ thuộc OCR)
-        for goc_ten, mong in (("007552-24.pdf", ("007552", "2024")), ("2023_027529.pdf", ("027529", "2023")),
-                              ("2022/1234.pdf", ("1234", "2022"))):
-            if tvb.so_nam_trong_ten(goc_ten) != mong:
-                thieu.append(f"tách số/năm từ tên {goc_ten}: {tvb.so_nam_trong_ten(goc_ten)}")
-        gt = tvb.gia_tri_ten("007552-24.pdf")
-        ten_thu = tvb.duong_dan_theo_mau("007552-24.pdf", "0076-{so_ten}-{nam_ten}-VB", gt, 1)[0]
-        if ten_thu != "0076-007552-2024-VB.pdf":
-            thieu.append(f"đặt tên theo số/năm trong tên file: {ten_thu}")
-        ten_thu = tvb.duong_dan_theo_mau("007552-24.pdf", "0076-{so_cc}-{nam}-VB", gt, 1)[0]
-        if ten_thu != "007552-24.pdf":  # không đọc được số CC: giữ tên gốc như trước, không tự đoán
-            thieu.append(f"không đọc được số CC mà không giữ tên gốc: {ten_thu}")
+        # đặt tên theo tên file gốc (không dựa vào OCR)
+        for goc_ten, dang, mong in (("007552-24.pdf", "{so_cc}-{nam}", "0076-007552-2024-VB.pdf"),
+                                    ("2023_027529.pdf", "{nam}_{so_cc}", "0076-027529-2023-VB.pdf"),
+                                    ("2022/1234.pdf", "{nam}/{so_cc}", "2022/0076-1234-2022-VB.pdf")):
+            gt = tvb.gia_tri_ten_theo_goc(goc_ten, dang)
+            ten_thu = tvb.duong_dan_theo_mau(goc_ten, "0076-{so_cc}-{nam}-VB", gt, 1)[0] if gt else None
+            if ten_thu != mong:
+                thieu.append(f"đặt tên theo tên gốc {goc_ten} ({dang}): {ten_thu}")
+        if tvb.tach_ten_goc("007552-24 (1).pdf", "{so_cc}-{nam}") is not None:
+            thieu.append("tên gốc sai dạng mà vẫn tách được")
+        # chạy thật: kết quả đặt tên theo tên gốc (file thử không đúng dạng -> giữ tên gốc, cần kiểm tra)
+        kq_tg = tvb.chay_tach(goc / "scan", goc / "ket_qua", dict(cfg, dat_ten_theo="ten_goc", dang_ten_goc="{bo_qua}_{so_cc}_{bo_qua}",
+                              mau_ten_vb="VB-{so_cc}"), so_luong=2, log=lambda s: None)
+        ten_tg = {r["duong_dan"][0]: (r["trang_thai"], r["file_van_ban"]) for r in kq_tg}
+        nhat_ky.append(f"Đặt tên theo tên gốc: H={ten_tg.get('H')}, A={ten_tg.get('A')}")
+        if ten_tg.get("H", ("", ""))[1] != "VB-2022.pdf" or ten_tg.get("A", ("", ""))[0] != "CAN_KIEM_TRA":
+            thieu.append(f"đặt tên theo tên gốc khi chạy: {ten_tg}")
         dat = len(kq) == 20 and not loi and not thieu and not sai_trang
         if sai_trang:
             thieu.append(f"kiểm tra số trang sai ở {sai_trang}")

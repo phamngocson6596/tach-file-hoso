@@ -925,8 +925,6 @@ TRUONG_TEN = {
     "ten": "tên file gốc",
     "so_cc": "số công chứng",
     "nam": "năm công chứng",
-    "so_ten": "số trong tên file gốc",
-    "nam_ten": "năm trong tên file gốc (24 → 2024)",
     "ngay": "ngày công chứng (năm-tháng-ngày)",
     "loai": "loại văn bản (tiêu đề, không dấu)",
     "stt": "số thứ tự văn bản trong file",
@@ -946,33 +944,80 @@ def so_cc_de_dat_ten(so_tho: list[str], so_cc: set[str], rel: str) -> str:
     return min(so_tho, key=len) if so_tho else ""
 
 
-def so_nam_trong_ten(rel: str) -> tuple[str, str]:
-    """Tách số công chứng và năm từ tên file gốc, giữ nguyên số 0 ở đầu:
-    007552-24 -> (007552, 2024); 2023_027529 -> (027529, 2023); 0001-24 -> (0001, 2024)."""
-    nhom = re.findall(r"\d+", Path(rel).stem)
-    la_nam = lambda x: (len(x) == 4 and 1990 <= int(x) <= 2099) or len(x) == 2  # noqa: E731
-    nam_ung = [x for x in nhom if la_nam(x)]
-    so_ung = [x for x in nhom if 3 <= len(x) <= 8]
-    so = next((x for x in so_ung if not (len(x) == 4 and la_nam(x)) or len(so_ung) == 1), "")
-    nam = next((x for x in reversed(nam_ung) if x != so), "")
-    if not nam:  # năm ở tên thư mục, vd 2022/1234.pdf
-        nam = next((x for thu_muc in reversed(Path(rel).parts[:-1]) for x in re.findall(r"\d{4}", thu_muc)
-                    if 1990 <= int(x) <= 2099), "")
-    if len(nam) == 2:
-        nam = ("20" if int(nam) <= time.localtime().tm_year % 100 + 1 else "19") + nam
-    return so, nam
-
-
 def gia_tri_ten(rel: str, so_cc: str = "", ngay=None, loai: str = "", stt: int = 1) -> dict:
-    """Giá trị các trường mẫu tên. {so_ten}, {nam_ten} lấy từ tên file gốc (chỉ dùng khi mẫu ghi rõ)."""
     y, m, d = ngay if ngay else (0, 0, 0)
     loai = re.sub(r"\s+", "_", bo_dau(loai))
     if len(loai) > 40:
         loai = loai[:40].rsplit("_", 1)[0]
-    so_ten, nam_ten = so_nam_trong_ten(rel)
     return dict(ten=Path(rel).stem, so_cc=so_cc or "", nam=str(y) if y else "",
-                so_ten=so_ten, nam_ten=nam_ten,
                 ngay=f"{y:04d}-{m:02d}-{d:02d}" if (y and m and d) else "", loai=loai, stt=str(stt))
+
+
+# --- Đặt tên theo tên file gốc: người dùng khai báo dạng tên gốc, vd "{so_cc}-{nam}" cho 007552-24.pdf ---
+TRUONG_DANG_TEN_GOC = {"so_cc": "số công chứng (dãy số)", "nam": "năm (2 hoặc 4 chữ số; 24 → 2024)",
+                       "bo_qua": "đoạn chữ không dùng tới"}
+TRUONG_TEN_THEO_GOC = ("ten", "so_cc", "nam", "stt")  # tên mới chỉ dùng các trường này: không phụ thuộc OCR
+
+
+def kiem_tra_dang_ten_goc(dang: str) -> str | None:
+    """Thông báo lỗi nếu dạng tên gốc không hợp lệ, None nếu hợp lệ."""
+    if not dang or not dang.strip():
+        return "Dạng tên gốc đang để trống."
+    tr = re.findall(r"\{(\w+)\}", dang)
+    la = [t for t in tr if t not in TRUONG_DANG_TEN_GOC]
+    if la:
+        return "Dạng tên gốc chỉ dùng {so_cc}, {nam}, {bo_qua}; không hiểu: " + ", ".join("{" + t + "}" for t in la)
+    if re.search(r"[{}]", re.sub(r"\{\w+\}", "", dang)):
+        return "Dấu ngoặc { } chưa đóng/mở đúng."
+    if not ({"so_cc", "nam"} & set(tr)):
+        return "Dạng tên gốc cần có {so_cc} hoặc {nam}."
+    if tr.count("so_cc") > 1 or tr.count("nam") > 1:
+        return "Mỗi trường {so_cc}, {nam} chỉ ghi một lần."
+    return None
+
+
+def _regex_dang_ten_goc(dang: str) -> re.Pattern:
+    phan = re.split(r"(\{\w+\})", dang.strip())
+    rx = {"{so_cc}": r"(?P<so_cc>\d+)", "{nam}": r"(?P<nam>(?:19|20)\d{2}|\d{2})", "{bo_qua}": r".*?"}
+    return re.compile("".join(rx.get(x, re.escape(x)) for x in phan), re.IGNORECASE)
+
+
+def tach_ten_goc(rel: str, dang: str) -> dict | None:
+    """Tách {so_cc}, {nam} từ tên file gốc theo dạng khai báo. Dạng có "/" thì khớp cả tên thư mục, vd
+    "{nam}/{so_cc}" cho 2022/1234.pdf. Không khớp thì trả None."""
+    if kiem_tra_dang_ten_goc(dang):
+        return None
+    phan = Path(rel).with_suffix("").parts
+    k = dang.strip().count("/") + 1
+    if len(phan) < k:
+        return None
+    m = _regex_dang_ten_goc(dang).fullmatch("/".join(phan[-k:]))
+    if not m:
+        return None
+    gt = {t: v for t, v in m.groupdict().items() if v}
+    if len(gt.get("nam", "")) == 2:
+        yy = int(gt["nam"])
+        gt["nam"] = ("20" if yy <= time.localtime().tm_year % 100 + 1 else "19") + gt["nam"]
+    return gt
+
+
+def kiem_tra_mau_theo_ten_goc(mau: str, dang: str) -> str | None:
+    """Mẫu tên mới khi đặt tên theo tên gốc: chỉ dùng {ten}, {stt} và các trường có trong dạng tên gốc."""
+    loi = kiem_tra_mau_ten(mau)
+    if loi:
+        return loi
+    co = set(re.findall(r"\{(\w+)\}", dang or ""))
+    sai = [t for t in re.findall(r"\{(\w+)\}", mau) if t not in TRUONG_TEN_THEO_GOC or (t in ("so_cc", "nam") and t not in co)]
+    if sai:
+        return ("Đặt tên theo tên gốc chỉ dùng {ten}, {stt} và trường có trong dạng tên gốc; không dùng được: "
+                + ", ".join("{" + t + "}" for t in sai))
+    return None
+
+
+def gia_tri_ten_theo_goc(rel: str, dang: str, stt: int = 1) -> dict | None:
+    gt = tach_ten_goc(rel, dang)
+    return None if gt is None else dict(ten=Path(rel).stem, so_cc=gt.get("so_cc", ""), nam=gt.get("nam", ""),
+                                        ngay="", loai="", stt=str(stt))
 
 
 def kiem_tra_mau_ten(mau: str) -> str | None:
@@ -1218,6 +1263,10 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
         def du(d):
             return d["co_md"] and d["co_lc"] and (d["quoc_hieu"] or not cfg["can_quoc_hieu"])
 
+        theo_goc = cfg.get("dat_ten_theo") == "ten_goc" and bool(doan)
+        if theo_goc and tach_ten_goc(rel, cfg.get("dang_ten_goc", "")) is None:
+            canh_bao.append(f"tên file gốc không đúng dạng đã khai báo '{cfg.get('dang_ten_goc', '')}': giữ tên gốc "
+                            "(muốn đổi thì sửa cột file_van_ban rồi Cắt bản chốt)")
         if not doan:
             trang_thai = "KHONG_THAY"
         elif all(du(d) for d in doan) and not canh_bao and (len(doan) == 1 or not cfg["mot_van_ban"]):
@@ -1250,9 +1299,13 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
         for k, (d, x) in enumerate(zip(doan, info)):
             dich = ra / thu_muc / ten_dau_ra(rel, len(doan), k)
             ghi_pdf(src, d["trang"], dich)
-            gt = gia_tri_ten(rel, so_cc_de_dat_ten(x["so_tho"], x["so_cc"], rel), x["ngay"], x["loai"], k + 1)
-            moi, qv = duong_dan_theo_mau(rel, mau_vb, gt, len(doan))
-            quay_ve |= qv
+            if theo_goc:
+                gt = gia_tri_ten_theo_goc(rel, cfg["dang_ten_goc"], k + 1)
+                moi, _ = duong_dan_theo_mau(rel, mau_vb if gt else "{ten}", gt or gia_tri_ten(rel, stt=k + 1), len(doan))
+            else:
+                gt = gia_tri_ten(rel, so_cc_de_dat_ten(x["so_tho"], x["so_cc"], rel), x["ngay"], x["loai"], k + 1)
+                moi, qv = duong_dan_theo_mau(rel, mau_vb, gt, len(doan))
+                quay_ve |= qv
             kq["doi_ten"].append([dich.relative_to(ra).as_posix(), f"{thu_muc}/{moi}"])
             ten_ra.append(moi.rsplit("/", 1)[-1])
         if cfg["xuat_ho_so"]:
@@ -1265,9 +1318,13 @@ def xu_ly_file(duong_dan: str, rel: str, cfg: dict) -> dict:
                     kq["thong_tin"] = " · ".join(thong_tin)
             if con_lai:
                 ghi_pdf(src, con_lai, ra / "ho_so" / rel)
-                x = info[0] if info else dict(so_tho=[], so_cc=set(), ngay=None, loai="")
-                gt = gia_tri_ten(rel, so_cc_de_dat_ten(x["so_tho"], x["so_cc"], rel), x["ngay"], x["loai"], 1)
-                moi, _ = duong_dan_theo_mau(rel, mau_hs, gt, 1)
+                if cfg.get("dat_ten_theo") == "ten_goc":
+                    gt = gia_tri_ten_theo_goc(rel, cfg.get("dang_ten_goc", ""))
+                    moi, _ = duong_dan_theo_mau(rel, mau_hs if gt else "{ten}", gt or gia_tri_ten(rel), 1)
+                else:
+                    x = info[0] if info else dict(so_tho=[], so_cc=set(), ngay=None, loai="")
+                    gt = gia_tri_ten(rel, so_cc_de_dat_ten(x["so_tho"], x["so_cc"], rel), x["ngay"], x["loai"], 1)
+                    moi, _ = duong_dan_theo_mau(rel, mau_hs, gt, 1)
                 kq["doi_ten"].append([f"ho_so/{rel}", f"ho_so/{moi}"])
         if quay_ve and mau_vb != "{ten}":
             thong_tin.append("thiếu số/ngày/loại để đặt tên theo mẫu: giữ tên gốc")
@@ -1470,10 +1527,23 @@ def cat_theo_bang(vao, ra, f_bang, log=print, cfg: dict | None = None) -> int:
             tach = lambda cot: [x.strip() for x in str(r.get(cot) or "").split(";")]  # noqa: E731
             so_l, ngay_l, loai_l = tach("so_cong_chung"), tach("ngay_cong_chung"), tach("loai_van_ban")
             lay = lambda l, k: l[k] if k < len(l) else (l[0] if len(l) == 1 else "")  # noqa: E731
+            theo_goc = cfg.get("dat_ten_theo") == "ten_goc"
+            # đặt tên theo tên gốc: cột file_van_ban (người dùng có thể sửa tay) được dùng nếu đủ số văn bản
+            ten_bang = [x for x in tach("file_van_ban") if x] if theo_goc else []
             for k, d in enumerate(ds):
-                gt = gia_tri_ten(rel, lay(so_l, k), _doc_ngay_bang(lay(ngay_l, k)), lay(loai_l, k), k + 1)
-                moi, qv = duong_dan_theo_mau(rel, mau_vb, gt, len(ds))
-                n_ten_goc += qv and mau_vb != "{ten}"
+                if theo_goc and len(ten_bang) == len(ds):
+                    ten = _KY_TU_CAM.sub("_", re.sub(r"(?i)\.pdf$", "", ten_bang[k])).strip(" .") + ".pdf"
+                    cha = Path(rel).parent.as_posix()
+                    moi = ten if cha in ("", ".") else f"{cha}/{ten}"
+                elif theo_goc:
+                    gt = gia_tri_ten_theo_goc(rel, cfg.get("dang_ten_goc", ""), k + 1)
+                    moi, _ = duong_dan_theo_mau(rel, mau_vb if gt else "{ten}", gt or gia_tri_ten(rel, stt=k + 1),
+                                                len(ds))
+                    n_ten_goc += gt is None
+                else:
+                    gt = gia_tri_ten(rel, lay(so_l, k), _doc_ngay_bang(lay(ngay_l, k)), lay(loai_l, k), k + 1)
+                    moi, qv = duong_dan_theo_mau(rel, mau_vb, gt, len(ds))
+                    n_ten_goc += qv and mau_vb != "{ten}"
                 ghi_pdf(src, d, dich_goc / bo_ten.lay(moi))
             if cfg.get("xuat_ho_so"):
                 trong = {x for d in ds for x in d}
@@ -1483,8 +1553,12 @@ def cat_theo_bang(vao, ra, f_bang, log=print, cfg: dict | None = None) -> int:
                     n_trang_trang += sum(1 for i in con_lai if i in trang_trang)
                     con_lai = [i for i in con_lai if i not in trang_trang]
                 if con_lai:
-                    gt = gia_tri_ten(rel, lay(so_l, 0), _doc_ngay_bang(lay(ngay_l, 0)), lay(loai_l, 0), 1)
-                    moi, _ = duong_dan_theo_mau(rel, mau_hs, gt, 1)
+                    if theo_goc:
+                        gt = gia_tri_ten_theo_goc(rel, cfg.get("dang_ten_goc", ""))
+                        moi, _ = duong_dan_theo_mau(rel, mau_hs if gt else "{ten}", gt or gia_tri_ten(rel), 1)
+                    else:
+                        gt = gia_tri_ten(rel, lay(so_l, 0), _doc_ngay_bang(lay(ngay_l, 0)), lay(loai_l, 0), 1)
+                        moi, _ = duong_dan_theo_mau(rel, mau_hs, gt, 1)
                     ghi_pdf(src, con_lai, dich_hs / bo_ten_hs.lay(moi))
             src.close()
             n_ok += 1
@@ -1494,7 +1568,10 @@ def cat_theo_bang(vao, ra, f_bang, log=print, cfg: dict | None = None) -> int:
         + f" · bỏ qua {n_bo} dòng trống/BO.")
     if n_trang_trang:
         log(f"  Đã bỏ {n_trang_trang} trang trắng khỏi phần hồ sơ.")
-    if n_ten_goc:
+    if n_ten_goc and cfg.get("dat_ten_theo") == "ten_goc":
+        log(f"  {n_ten_goc} văn bản có tên file gốc không đúng dạng đã khai báo nên giữ tên gốc "
+            "(sửa cột file_van_ban rồi cắt lại).")
+    elif n_ten_goc:
         log(f"  {n_ten_goc} văn bản thiếu số/ngày/loại để đặt tên theo mẫu nên giữ tên gốc "
             "(điền vào cột so_cong_chung / ngay_cong_chung / loai_van_ban rồi cắt lại).")
     return n_ok
@@ -1545,6 +1622,8 @@ def cfg_mac_dinh() -> dict:
         engine="tesseract", dpi=200, lang="vie", tesseract=None, tessdata=None, luon_ocr=False, nguong_trang=0.002,
         # đầu ra
         mau_ten_vb="{ten}",        # mẫu tên file văn bản, vd "{nam}_{so_cc}_{loai}"
+        dat_ten_theo="ocr",        # "ocr": số/ngày/loại đọc từ văn bản; "ten_goc": tách từ tên file gốc
+        dang_ten_goc="{so_cc}-{nam}",  # dạng tên file gốc khi dat_ten_theo="ten_goc", vd 007552-24.pdf
         mau_ten_hs="{ten}",        # mẫu tên file hồ sơ còn lại (thư mục ho_so), vd "{ten}_HS"
         xem_tat_ca=False, xuat_ho_so=False, luu_chu=False, dpi_anh=40, debug=False,
         bo_trang_trang_ho_so=True,  # bỏ trang trắng khỏi phần hồ sơ (văn bản thì mặc định đã bỏ)
@@ -1987,6 +2066,9 @@ def main():
     g.add_argument("--ten-van-ban", default=md["mau_ten_vb"],
                    help="mẫu tên file văn bản; trường: " + ", ".join("{%s} %s" % kv for kv in TRUONG_TEN.items()))
     g.add_argument("--ten-ho-so", default=md["mau_ten_hs"], help="mẫu tên file hồ sơ còn lại, vd {ten}_HS")
+    g.add_argument("--dang-ten-goc", default=None,
+                   help="đặt tên theo tên file gốc (không dựa vào OCR): khai báo dạng tên gốc, vd '{so_cc}-{nam}' "
+                        "cho 007552-24.pdf; trường: " + ", ".join("{%s} %s" % kv for kv in TRUONG_DANG_TEN_GOC.items()))
     g.add_argument("--giu-trang-trang-ho-so", action="store_true", help="giữ trang trắng trong phần hồ sơ (mặc định bỏ)")
     g.add_argument("--luu-chu", action="store_true", help="lưu chữ OCR từng file vào chu_ocr/ (để dò lỗi)")
     g.add_argument("--theo-bang", "--theo-csv", dest="theo_bang",
@@ -1994,22 +2076,25 @@ def main():
     g.add_argument("--debug", action="store_true")
     a = ap.parse_args()
 
+    ten_goc = dict(dat_ten_theo="ten_goc", dang_ten_goc=a.dang_ten_goc) if a.dang_ten_goc else {}
+    if ten_goc and kiem_tra_dang_ten_goc(a.dang_ten_goc):
+        sys.exit(f"Dạng tên gốc '{a.dang_ten_goc}' không hợp lệ: {kiem_tra_dang_ten_goc(a.dang_ten_goc)}")
     for mau in (a.ten_van_ban, a.ten_ho_so):
-        loi = kiem_tra_mau_ten(mau)
+        loi = kiem_tra_mau_theo_ten_goc(mau, a.dang_ten_goc) if ten_goc else kiem_tra_mau_ten(mau)
         if loi:
             sys.exit(f"Mẫu tên '{mau}' không hợp lệ: {loi}")
     if a.theo_bang:
         cat_theo_bang(a.vao, a.ra, a.theo_bang,
                       cfg=dict(mau_ten_vb=a.ten_van_ban, mau_ten_hs=a.ten_ho_so, xuat_ho_so=a.xuat_ho_so,
                                bo_trang_trang_ho_so=not a.giu_trang_trang_ho_so, dpi=a.dpi, lang=a.lang,
-                               engine=a.engine, luon_ocr=a.luon_ocr, nguong_trang=a.nguong_trang))
+                               engine=a.engine, luon_ocr=a.luon_ocr, nguong_trang=a.nguong_trang, **ten_goc))
         return
     cfg = dict(md, mau_ten_vb=a.ten_van_ban, mau_ten_hs=a.ten_ho_so, bo_trang_trang_ho_so=not a.giu_trang_trang_ho_so, mot_van_ban=not a.nhieu_van_ban, vi_tri=a.vi_tri, so_cc_trong_ten=a.so_cc_trong_ten,
                ten_to_chuc=a.ten_to_chuc, uu_tien_ngay_moi=not a.khong_uu_tien_ngay,
                can_quoc_hieu=not a.khong_can_quoc_hieu, giu_trang_trang=a.giu_trang_trang,
                engine=a.engine, dpi=a.dpi, lang=a.lang, tesseract=a.tesseract, luon_ocr=a.luon_ocr,
                nguong_trang=a.nguong_trang, xem_tat_ca=a.xem_tat_ca, xuat_ho_so=a.xuat_ho_so,
-               luu_chu=a.luu_chu, debug=a.debug)
+               luu_chu=a.luu_chu, debug=a.debug, **ten_goc)
     ok, tb = kiem_tra_ocr(cfg)
     if not ok:
         sys.exit(tb)
